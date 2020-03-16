@@ -68,18 +68,20 @@ class E2ETest:
 
         testfile = f"expect.{expect}.ndjson"
 
-        expected_data = self._load_testfile(testfile)
+        expected_data = sort_lines(self._load_testfile(testfile))
         r = requests.get(f"{self.api_base}{endpoint}")
 
         if r.status_code != 200:
             self._log_error(f"Error requesting {endpoint}")
 
-        success = sort_lines(r.text) == sort_lines(expected_data)
+        received = sort_lines(r.text)
 
-        if success:
+        if received == expected_data:
             self._log_info(f"{step_name}: OK")
         else:
             self._log_error(f"{step_name}: ERROR")
+            self._log_error(f"Expected data: {','.join(expected_data)}")
+            self._log_error(f"Received data: {','.join(received)}")
 
     def _log_error(self, message):
         logger.error(message)
@@ -148,6 +150,7 @@ class E2ETest:
                 workflow.append(self._relate_workflow_definition(
                     self.test_catalog,
                     src_entity,
+                    # Extract relation name from dst_rel (rtc_ref_to_c > ref_to_c)
                     '_'.join(dst_rel.split('_')[1:])
                 ))
 
