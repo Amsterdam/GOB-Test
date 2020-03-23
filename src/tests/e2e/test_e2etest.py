@@ -106,11 +106,14 @@ class TestE2Test(TestCase):
         e2e.check_import_endpoint = 'import endpoint'
         e2e._import_workflow_definition = lambda *args: "import " + ",".join(args)
         e2e._check_workflow_step_definition = lambda *args: "check " + ",".join(args)
+        e2e._relate_workflow_definition = lambda *args: "relate " + ",".join(args)
 
         self.assertEqual([
             "import test cat,import entity,src A",
+            "relate test cat,import entity,reference",
             "check import endpoint,src A,Import src A",
             "import test cat,import entity,src B",
+            "relate test cat,import entity,reference",
             "check import endpoint,src B,Import src B",
         ], e2e._build_import_test_workflow())
 
