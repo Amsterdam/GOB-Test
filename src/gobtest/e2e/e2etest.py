@@ -25,6 +25,7 @@ class E2ETest:
     test_catalog = "test_catalogue"
 
     test_import_entity = "test_entity"
+    test_import_entity_reference = "reference"
     test_import_sources = [
         "DELETE_ALL",
         "ADD",
@@ -165,6 +166,8 @@ class E2ETest:
         workflow = []
         for source in self.test_import_sources:
             workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity, source))
+            workflow.append(self._relate_workflow_definition(self.test_catalog, self.test_import_entity,
+                                                             self.test_import_entity_reference))
             workflow.append(self._check_workflow_step_definition(self.check_import_endpoint, source,
                                                                  f"Import {source}"))
         return workflow
