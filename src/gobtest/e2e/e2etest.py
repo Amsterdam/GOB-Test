@@ -63,19 +63,29 @@ class E2ETest:
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
 
     def _remove_last_event(self, api_response: str):
+        """
+        Change all last_event values in the API response to an empty string
+
+        :param api_response:
+        :return:
+        """
         lines = api_response.split('\n')
 
+        # Check header line for last_event column
         firstline = lines[0].split(';')
 
         try:
             idx = firstline.index('"_last_event"')
         except ValueError:
+            # No last event found, return the original API response
             return api_response
 
+        # Keep original header
         result = [lines[0]]
 
         for line in lines[1:]:
             if line:
+                # Change last event column by ''
                 split = line.split(';')
                 split[idx] = ''
                 result.append(';'.join(split))
