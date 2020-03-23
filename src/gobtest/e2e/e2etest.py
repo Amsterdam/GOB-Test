@@ -62,6 +62,38 @@ class E2ETest:
 
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
 
+    def _remove_last_event(self, api_response: str):
+        """
+        Change all last_event values in the API response to an empty string
+
+        :param api_response:
+        :return:
+        """
+        lines = api_response.split('\n')
+
+        # Check header line for last_event column
+        firstline = lines[0].split(';')
+
+        try:
+            idx = firstline.index('"_last_event"')
+        except ValueError:
+            # No last event found, return the original API response
+            return api_response
+
+        # Keep original header
+        result = [lines[0]]
+
+        for line in lines[1:]:
+            if line:
+                # Change last event column by ''
+                split = line.split(';')
+                split[idx] = ''
+                result.append(';'.join(split))
+            else:
+                # Empty line
+                result.append(line)
+        return "\n".join(result)
+
     def _check_api_output(self, endpoint: str, expect: str, step_name: str):
         def sort_lines(data: str):
             return "\n".join(sorted(data.split("\n")))
@@ -74,14 +106,14 @@ class E2ETest:
         if r.status_code != 200:
             self._log_error(f"Error requesting {endpoint}")
 
-        received = sort_lines(r.text)
+        received = sort_lines(self._remove_last_event(r.text))
 
         if received == expected_data:
             self._log_info(f"{step_name}: OK")
         else:
             self._log_error(f"{step_name}: ERROR")
-            self._log_error(f"Expected data: {','.join(expected_data)}")
-            self._log_error(f"Received data: {','.join(received)}")
+            self._log_error(f"Expected data: {expected_data}")
+            self._log_error(f"Received data: {received}")
 
     def _log_error(self, message):
         logger.error(message)
