@@ -8,6 +8,14 @@ from gobtest.e2e.e2etest import E2ETest, IMPORT, RELATE, END_TO_END_CHECK
 @patch("gobtest.e2e.e2etest.logger", MagicMock())
 class TestE2Test(TestCase):
 
+    def test_remove_last_event(self):
+        e2e = E2ETest()
+        inp = "a;b;c\n1;2;3\n4;5;6\n"
+        self.assertEqual(inp, e2e._remove_last_event(inp))
+
+        inp = '"a";"b";"c";"_last_event"\n1;2;3;4\n5;6;7;8\n'
+        self.assertEqual('"a";"b";"c";"_last_event"\n1;2;3;\n5;6;7;\n', e2e._remove_last_event(inp))
+
     @patch("gobtest.e2e.e2etest.requests.get")
     def test_check_api_output(self, mock_get):
         api_result = "A\nB\nC"
@@ -16,9 +24,11 @@ class TestE2Test(TestCase):
         mock_get.return_value = type('MockResponse', (object,), {'status_code': 200, 'text': api_result})
         e2e = E2ETest()
         e2e._load_testfile = MagicMock(return_value=expected_result)
+        e2e._remove_last_event = MagicMock(side_effect=lambda x: x)
         e2e.api_base = 'API_BASE'
 
         e2e._check_api_output('/some/endpoint', 'some testfile', 'Test API Output')
+        e2e._remove_last_event.assert_called_with(mock_get.return_value.text)
 
         mock_get.assert_called_with('API_BASE/some/endpoint')
 
@@ -30,6 +40,7 @@ class TestE2Test(TestCase):
         mock_get.return_value = type('MockResponse', (object,), {'status_code': 500, 'text': api_result})
         e2e = E2ETest()
         e2e._load_testfile = MagicMock(return_value=expected_result)
+        e2e._remove_last_event = MagicMock(side_effect=lambda x: x)
 
         e2e._check_api_output('/some/endpoint', 'some testfile', 'Test API Output')
 
@@ -41,6 +52,7 @@ class TestE2Test(TestCase):
         mock_get.return_value = type('MockResponse', (object,), {'status_code': 200, 'text': api_result})
         e2e = E2ETest()
         e2e._load_testfile = MagicMock(return_value=expected_result)
+        e2e._remove_last_event = MagicMock(side_effect=lambda x: x)
 
         e2e._check_api_output('/some/endpoint', 'some testfile', 'Test API Output')
 
