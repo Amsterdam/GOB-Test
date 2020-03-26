@@ -25,7 +25,15 @@ class E2ETest:
     test_catalog = "test_catalogue"
 
     test_import_entity = "test_entity"
+    test_import_entity_ref = "test_entity_ref"
     test_import_entity_reference = "reference"
+
+    # Provide the test_entities in test_import_sources with valid references
+    test_import_ref_sources = [
+        "ADD",
+        "MODIFY1"
+    ]
+
     test_import_sources = [
         "DELETE_ALL",
         "ADD",
@@ -164,6 +172,12 @@ class E2ETest:
 
     def _build_import_test_workflow(self):
         workflow = []
+
+        # Import test_entity_ref's to prevent dangling relations
+        for source in self.test_import_ref_sources:
+            workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity_ref, source))
+
+        # Import test_entity's
         for source in self.test_import_sources:
             workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity, source))
             workflow.append(self._relate_workflow_definition(self.test_catalog, self.test_import_entity,
