@@ -108,14 +108,18 @@ class TestE2Test(TestCase):
         e2e._check_workflow_step_definition = lambda *args: "check " + ",".join(args)
         e2e._relate_workflow_definition = lambda *args: "relate " + ",".join(args)
 
-        self.assertEqual([
+        expect = [
+            'import test cat,test_entity_ref,ADD',
+            'import test cat,test_entity_ref,MODIFY1',
             "import test cat,import entity,src A",
             "relate test cat,import entity,reference",
             "check import endpoint,src A,Import src A",
             "import test cat,import entity,src B",
             "relate test cat,import entity,reference",
             "check import endpoint,src B,Import src B",
-        ], e2e._build_import_test_workflow())
+        ]
+        result = e2e._build_import_test_workflow()
+        self.assertEqual(result, expect)
 
     def test_build_relate_test_workflow(self):
         e2e = E2ETest()
