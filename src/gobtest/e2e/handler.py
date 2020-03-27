@@ -14,6 +14,8 @@ def end_to_end_test_handler(msg):
     :return:
     """
     logger.configure(msg, 'E2E Test')
+    logger.info("Clear any previous test data")
+    E2ETest().cleartests()
     logger.info("Start E2E Test")
     return {
         'header': {

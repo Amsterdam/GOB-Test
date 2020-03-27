@@ -187,3 +187,16 @@ class TestE2Test(TestCase):
 
         e2e.check('a', 'b', 'c')
         e2e._check_api_output.assert_called_with('a', 'b', 'c')
+
+    @patch("gobtest.e2e.e2etest.requests.delete")
+    def test_cleartests(self, mock_delete):
+        mock_delete.return_value.status_code = 200
+        e2e = E2ETest()
+        e2e._log_error = MagicMock()
+        e2e.cleartests()
+        mock_delete.assert_called()
+        e2e._log_error.assert_not_called()
+
+        mock_delete.return_value.status_code = 'any error code'
+        e2e.cleartests()
+        e2e._log_error.assert_called()
