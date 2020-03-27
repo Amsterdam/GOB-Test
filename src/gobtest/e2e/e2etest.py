@@ -26,12 +26,25 @@ class E2ETest:
 
     test_import_entity = "test_entity"
     test_import_entity_ref = "test_entity_ref"
+    test_import_entity_autoid = "test_entity_autoid"
     test_import_entity_reference = "reference"
 
     # Provide the test_entities in test_import_sources with valid references
     test_import_ref_sources = [
         "ADD",
         "MODIFY1"
+    ]
+
+    test_import_autoid_sources = [
+        "AUTOID_DELETE",
+        "AUTOID",
+        "AUTOID_DELETE",
+        "AUTOID",
+        "AUTOID",
+        "AUTOID_ADD",
+        "AUTOID_DELETE",
+        "AUTOID_MODIFY",
+        "AUTOID",
     ]
 
     test_import_sources = [
@@ -70,6 +83,7 @@ class E2ETest:
     api_base = f"{API_HOST}/gob"
 
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
+    check_autoid_endpoint = "/test_catalogue/test_entity_autoid/?ndjson=true"
 
     def _remove_last_event(self, api_response: str):
         """
@@ -170,6 +184,19 @@ class E2ETest:
             }
         }
 
+    def _build_autoid_test_workflow(self):
+        workflow = []
+
+        # Import test_entity_autoid's to test autoid issuing
+        for source in self.test_import_autoid_sources:
+            workflow.append(self._import_workflow_definition(self.test_catalog,
+                                                             self.test_import_entity_autoid,
+                                                             source))
+            workflow.append(self._check_workflow_step_definition(self.check_autoid_endpoint,
+                                                                 source,
+                                                                 f"Import {source}"))
+        return workflow
+
     def _build_import_test_workflow(self):
         workflow = []
 
@@ -214,7 +241,9 @@ class E2ETest:
         return workflow
 
     def _build_e2e_workflow(self):
-        return self._build_import_test_workflow() + self._build_relate_test_workflow()
+        return self._build_autoid_test_workflow() +\
+               self._build_import_test_workflow() +\
+               self._build_relate_test_workflow()
 
     def get_workflow(self):
         """Receives end-to-end start message.
