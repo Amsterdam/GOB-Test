@@ -82,6 +82,7 @@ class E2ETest:
 
     api_base = f"{API_HOST}/gob"
 
+    clear_tests_endpoint = "/alltests/"
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
     check_autoid_endpoint = "/test_catalogue/test_entity_autoid/?ndjson=true"
 
@@ -116,6 +117,11 @@ class E2ETest:
                 # Empty line
                 result.append(line)
         return "\n".join(result)
+
+    def cleartests(self):
+        r = requests.delete(f"{self.api_base}{self.clear_tests_endpoint}")
+        if r.status_code != 200:
+            self._log_error(f"Error clearing tests")
 
     def _check_api_output(self, endpoint: str, expect: str, step_name: str):
         def sort_lines(data: str):
