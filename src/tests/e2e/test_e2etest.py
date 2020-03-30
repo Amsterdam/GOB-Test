@@ -98,6 +98,25 @@ class TestE2Test(TestCase):
             }
         }, E2ETest()._relate_workflow_definition('cat', 'col', 'attr'))
 
+    def test_build_autoid_test_workflow(self):
+        e2e = E2ETest()
+        e2e.test_catalog = 'test cat'
+        e2e.test_import_entity_autoid = 'autoid entity'
+        e2e.test_import_autoid_sources = ['src A', 'src B']
+        e2e.check_autoid_endpoint = 'autoid endpoint'
+        e2e._import_workflow_definition = lambda *args: "import " + ",".join(args)
+        e2e._check_workflow_step_definition = lambda *args: "check " + ",".join(args)
+
+        expect = [
+            'import test cat,autoid entity,src A',
+            'check autoid endpoint,src A,Import src A',
+            'import test cat,autoid entity,src B',
+            'check autoid endpoint,src B,Import src B'
+        ]
+        result = e2e._build_autoid_test_workflow()
+        print(result)
+        self.assertEqual(result, expect)
+
     def test_build_import_test_workflow(self):
         e2e = E2ETest()
         e2e.test_catalog = 'test cat'
@@ -152,9 +171,10 @@ class TestE2Test(TestCase):
 
     def test_build_e2e_workflow(self):
         e2e = E2ETest()
+        e2e._build_autoid_test_workflow = MagicMock(return_value=['0', '1'])
         e2e._build_import_test_workflow = MagicMock(return_value=['a', 'b'])
         e2e._build_relate_test_workflow = MagicMock(return_value=['c', 'd'])
-        self.assertEqual(['a', 'b', 'c', 'd'], e2e._build_e2e_workflow())
+        self.assertEqual(['0', '1', 'a', 'b', 'c', 'd'], e2e._build_e2e_workflow())
 
     def test_get_workflow(self):
         e2e = E2ETest()
@@ -167,3 +187,16 @@ class TestE2Test(TestCase):
 
         e2e.check('a', 'b', 'c')
         e2e._check_api_output.assert_called_with('a', 'b', 'c')
+
+    @patch("gobtest.e2e.e2etest.requests.delete")
+    def test_cleartests(self, mock_delete):
+        mock_delete.return_value.status_code = 200
+        e2e = E2ETest()
+        e2e._log_error = MagicMock()
+        e2e.cleartests()
+        mock_delete.assert_called()
+        e2e._log_error.assert_not_called()
+
+        mock_delete.return_value.status_code = 'any error code'
+        e2e.cleartests()
+        e2e._log_error.assert_called()
