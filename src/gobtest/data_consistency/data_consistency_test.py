@@ -262,16 +262,33 @@ WHERE
         return start_error_cnt == len(logger.get_errors())
 
     def _get_row_id(self, source_row: dict):
-        return source_row.get(self.import_definition['gob_mapping'][self.entity_id_field]['source_mapping'])
+        return source_row.get(self.entity_id_field)
 
     def _get_matching_gob_row(self, source_row: dict):
-        query = f"SELECT * FROM {self.catalog_name}.{self.collection_name} " \
-                f"WHERE {FIELD.ID}='{self._get_row_id(source_row)}'"
+        """
+        A matching row in the analysis database has the following properties:
+        - The _source, _application and _source_id should match
 
+        For entities with state the sequence number should also match
+
+        :param source_row:
+        :return:
+        """
+        source_def = self.import_definition['source']
+        source_id = source_row[source_def['entity_id']]
+
+        where = []
         if self.has_states:
-            query += f" AND {FIELD.SEQNR}=" \
-                     f"'{source_row[self.import_definition['gob_mapping'][FIELD.SEQNR]['source_mapping']]}'"
+            seq_nr = source_row[self.import_definition['gob_mapping'][FIELD.SEQNR]['source_mapping']]
+            # Select matching sequence number
+            where.append(f"{FIELD.SEQNR} = '{seq_nr}'")
+            # GOB populates the source_id with the sequence number
+            source_id = f"{source_id}.{seq_nr}"
 
+        # select matching source id
+        where.append(f"{FIELD.SOURCE_ID} = '{source_id}'")
+
+        query = self._select_from_gob_query(select="*", where=where)
         result = self.analyse_db.read(query)
 
         return dict(result[0]) if result else None
