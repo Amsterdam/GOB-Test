@@ -12,7 +12,7 @@ class TestDataConsistencyTestInit(TestCase):
     """
 
     def test_init(self, mock_model, mock_get_import_definition):
-        mock_model.return_value.get_collection.return_value = {'has_states': 'SioNo'}
+        mock_model.return_value.get_collection.return_value = {'has_states': 'SioNo', 'references': []}
         mock_get_import_definition.return_value = {
             'source': {
                 'entity_id': 'THE ENTITY ID',
@@ -40,6 +40,7 @@ class TestDataConsistencyTestInit(TestCase):
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel", MagicMock())
 class TestDataConsistencyTest(TestCase):
 
+    @patch("gobtest.data_consistency.data_consistency_test.ProgressTicker", MagicMock())
     @patch("gobtest.data_consistency.data_consistency_test.logger")
     @patch("gobtest.data_consistency.data_consistency_test.random")
     def test_run(self, mock_random, mock_logger):
@@ -54,10 +55,12 @@ class TestDataConsistencyTest(TestCase):
         inst._get_source_data = MagicMock(return_value=[
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         ])
+        inst._get_gob_count = lambda: 13
 
         inst.run()
         mock_random.randint.assert_called_with(0, 3)
         inst._get_matching_gob_row.assert_has_calls([
+            call(0),
             call(2),
             call(6),
             call(10),
@@ -68,9 +71,9 @@ class TestDataConsistencyTest(TestCase):
         ])
 
         mock_logger.warning.assert_called_with('Row with id row id missing')
-        mock_logger.error.assert_called_with('Have 1 missing rows in GOB, of 3 total rows.')
-        mock_logger.info.assert_called_with('Completed data consistency test on 3 rows. '
-                                            '1 rows contained errors. 1 rows could not be found.')
+        mock_logger.error.assert_called_with('Have 2 missing rows in GOB, of 4 total rows.')
+        mock_logger.info.assert_called_with('Completed data consistency test on 4 rows. '
+                                            '1 rows contained errors. 2 rows could not be found.')
 
         # Check with higher threshold. Error should not be logged now.
         mock_logger.error.reset_mock()
@@ -230,13 +233,13 @@ class TestDataConsistencyTest(TestCase):
         inst.entity_id_field = 'the id'
         inst.import_definition = {
             'gob_mapping': {
-                'the id': {
-                    'source_mapping': 'idfield'
+                'GOB id': {
+                    'source_mapping': 'the id'
                 }
             }
         }
 
-        self.assertEqual('a', inst._get_row_id({'idfield': 'a'}))
+        self.assertEqual('a', inst._get_row_id({'the id': 'a'}))
 
     def test_get_matching_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -246,8 +249,13 @@ class TestDataConsistencyTest(TestCase):
         inst.entity_id_field = 'ai die'
 
         inst.import_definition = {
+            'source': {
+              'name': 'any source',
+              'application': 'any application',
+              'entity_id': 'idfield'
+            },
             'gob_mapping': {
-                'ai die': {
+                'GOB id': {
                     'source_mapping': 'idfield'
                 },
                 'volgnummer': {
@@ -261,7 +269,17 @@ class TestDataConsistencyTest(TestCase):
         }
 
         self.assertEqual({'the': 'row'}, inst._get_matching_gob_row(source_row))
-        inst.analyse_db.read.assert_called_with("SELECT * FROM cat.col WHERE _id='ID' AND volgnummer='SEQNR'")
+        inst.analyse_db.read.assert_called_with("""\
+SELECT
+    *
+FROM
+    cat.col
+WHERE
+    _source = 'any source' AND
+    _application = 'any application' AND
+    volgnummer = 'SEQNR' AND
+    _source_id = 'ID.SEQNR'
+""")
 
     def test_get_source_data(self):
         inst = DataConsistencyTest('cat', 'col')
