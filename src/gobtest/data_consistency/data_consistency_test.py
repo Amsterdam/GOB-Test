@@ -1,6 +1,7 @@
 import random
 import re
 
+from gobcore.utils import ProgressTicker
 from gobconfig.import_.import_config import get_import_definition
 from gobcore.datastore.factory import DatastoreFactory
 from gobconfig.datastore.config import get_datastore_config
@@ -59,20 +60,31 @@ class DataConsistencyTest:
         success = 0
         missing = 0
 
-        for row in rows:
+        gob_count = self._get_gob_count()
 
-            if cnt % test_every == random_offset:
-                gob_row = self._get_matching_gob_row(row)
+        with ProgressTicker(f"Compare data ({gob_count:,})", 10000) as progress:
+            for row in rows:
+                progress.tick()
 
-                if not gob_row:
-                    seqnr = f' and volgnummer {row.get(FIELD.SEQNR)}' if self.has_states else ''
-                    logger.warning(f"Row with id {self._get_row_id(row)}{seqnr} missing")
-                    missing += 1
-                else:
-                    success += int(self._validate_row(row, gob_row))
-                checked += 1
+                # Always test the first row, test other rows at random
+                if cnt == 0 or cnt % test_every == random_offset:
+                    gob_row = self._get_matching_gob_row(row)
 
-            cnt += 1
+                    if not gob_row:
+                        seqnr = f' and volgnummer {row.get(FIELD.SEQNR)}' if self.has_states else ''
+                        logger.warning(f"Row with id {self._get_row_id(row)}{seqnr} missing")
+                        missing += 1
+                    else:
+                        success += int(self._validate_row(row, gob_row))
+                    checked += 1
+
+                cnt += 1
+
+                if cnt > 25000:
+                    break
+
+        if gob_count != cnt:
+            logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count)})")
 
         if checked and float(missing) / checked > self.MISSING_THRESHOLD:
             logger.error(f"Have {missing} missing rows in GOB, of {checked} total rows.")
@@ -139,6 +151,41 @@ class DataConsistencyTest:
             gob_row[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
 
         return {k: v for k, v in gob_row.items() if k not in self.ignore_columns}
+
+    def _select_from_gob_query(self, select, where=None):
+        """
+        The GOB data that corresponds with the source is characterised by at least a
+        matching source and application
+
+        :return:
+        """
+        source_def = self.import_definition['source']
+        source = source_def['name']
+        application = source_def['application']
+
+        where = [
+            f"{FIELD.SOURCE} = '{source}'",
+            f"{FIELD.APPLICATION} = '{application}'"
+        ] + (where or [])
+        where = " AND\n    ".join(where)
+        return f"""\
+SELECT
+    {select}
+FROM
+    {self.catalog_name}.{self.collection_name}
+WHERE
+    {where}
+"""
+
+    def _get_gob_count(self):
+        """
+        Return the number of entities in GOB
+
+        :return:
+        """
+        query = self._select_from_gob_query(select="count(*)")
+        result = self.analyse_db.read(query)
+        return dict(result[0])['count']
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
         expected_values = self._transform_source_row(source_row)
