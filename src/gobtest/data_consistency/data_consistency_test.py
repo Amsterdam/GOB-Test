@@ -9,7 +9,7 @@ from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
 from gobcore.typesystem import get_gob_type_from_info, is_gob_reference_type
-from gobcore.typesystem.gob_types import Reference
+from gobcore.typesystem.gob_types import Reference, JSON
 from gobcore.typesystem.gob_secure_types import Secure
 from gobcore.logging.logger import logger
 
@@ -55,6 +55,7 @@ class DataConsistencyTest:
         self.entity_id_field = self.source['entity_id']
         self.has_states = self.collection.get('has_states', False)
         self.gob_key_errors = {}
+        self.src_key_warnings = {}
 
         # Ignore enriched attributes by default
         self.ignore_columns = self.default_ignore_columns + list(self.source.get('enrich', {}).keys())
@@ -111,9 +112,20 @@ class DataConsistencyTest:
         for key_error in self.gob_key_errors.values():
             logger.error(key_error)
 
+        for key_warning in self.src_key_warnings.values():
+            logger.warning(key_warning)
+
         logger.info(f"Completed data consistency test on {checked:,} rows of {cnt:,} rows total." +
                     f" {(checked - success - missing):,} rows contained errors." +
                     f" {missing:,} rows could not be found.")
+
+    def _src_key_warning(self, attr_name, msg):
+        self.src_key_warnings[attr_name] = msg
+
+    def _gob_key_error(self, attr_name, msg):
+        if not attr_name in self.src_key_warnings:
+            # Don't report about something already noticed in the source
+            self.gob_key_errors[attr_name] = msg
 
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
@@ -153,13 +165,14 @@ class DataConsistencyTest:
 
             if mapping is None:
                 value = self.SKIP_VALUE
+                self._src_key_warning(attr_name, f"Skip {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping['source_mapping']
                 type = get_gob_type_from_info(attr)
-                if is_gob_reference_type(attr['type']):
+                if issubclass(type, Reference):
                     self._unpack_reference(type, attr_name, mapping, source_row, result)
                     continue
-                elif isinstance(source_mapping, dict):
+                elif issubclass(type, JSON):
                     self._unpack_json(attr_name, mapping, source_row, result)
                     continue
                 elif source_mapping in source_row:
@@ -169,6 +182,7 @@ class DataConsistencyTest:
                     if attr['type'].startswith('GOB.Geo'):
                         value = self._normalise_wkt(value)
                 else:
+                    self._src_key_warning(attr_name, f"Skip {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
 
             result[attr_name] = value
@@ -208,6 +222,9 @@ class DataConsistencyTest:
             dst_value = value[attr] if attr else value
         else:
             # many reference (list) value
+            if value and not isinstance(value, list):
+                # ';' separated string value that represents an array
+                value = value.split(';')
             dst_value = [item[attr] if attr else item for item in value] if value else []
 
         result[dst_key] = dst_value
@@ -221,9 +238,15 @@ class DataConsistencyTest:
         :param source_row:
         :return:
         """
-        for nested_gob_key, source_key in mapping['source_mapping'].items():
-            dst_key = f'{attr_name}_{nested_gob_key}'
-            result[dst_key] = source_row[source_key]
+        source_mapping  = mapping['source_mapping']
+        if isinstance(source_mapping, dict):
+            for nested_gob_key, source_key in source_mapping.items():
+                # Skip values that are not found, e.g. BAG verblijfsobjecten fng_omschrijving that is set in code
+                dst_key = f'{attr_name}_{nested_gob_key}'
+                result[dst_key] = source_row.get(source_key, self.SKIP_VALUE)
+        else:
+            # Skip JSON's that are not imported per attribute
+            self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non-JSON")
 
     def _transform_gob_row(self, gob_row: dict):
 
@@ -296,7 +319,7 @@ WHERE
             try:
                 gob_value = gob_row.pop(attr)
             except KeyError:
-                self.gob_key_errors[attr] = f"Missing key {attr} in GOB"
+                self._gob_key_error(attr, f"Missing key {attr} in GOB")
                 continue
 
             if value != self.SKIP_VALUE and not self.equal_values(value, gob_value):
