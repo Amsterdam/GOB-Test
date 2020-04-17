@@ -103,17 +103,17 @@ class DataConsistencyTest:
 
     def _log_result(self, checked, cnt, gob_count, missing, success):
         if gob_count != cnt:
-            logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count)})")
+            logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count):,})")
 
         if checked and float(missing) / checked > self.MISSING_THRESHOLD:
-            logger.error(f"Have {missing} missing rows in GOB, of {checked} total rows.")
+            logger.error(f"Have {missing:,} missing rows in GOB, of {checked:,} total rows.")
 
         for key_error in self.gob_key_errors.values():
             logger.error(key_error)
 
-        logger.info(f"Completed data consistency test on {checked} rows of {cnt} rows total." +
-                    f" {checked - success - missing} rows contained errors." +
-                    f" {missing} rows could not be found.")
+        logger.info(f"Completed data consistency test on {checked:,} rows of {cnt:,} rows total." +
+                    f" {(checked - success - missing):,} rows contained errors." +
+                    f" {missing:,} rows could not be found.")
 
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
@@ -280,9 +280,9 @@ WHERE
         """
         if isinstance(src_value, list):
             # Skip any None values from the source list
-            src_value = ','.join([str(v).strip() for v in src_value if v is not None])
+            src_value = ','.join(sorted([str(v).strip() for v in src_value if v is not None]))
             # Rebuild the GOB list from the string, skipping empty values
-            gob_value = ','.join([str(v).strip() for v in gob_value[1:-1].split(',') if v])
+            gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v]))
         return str(src_value) == str(gob_value)
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:

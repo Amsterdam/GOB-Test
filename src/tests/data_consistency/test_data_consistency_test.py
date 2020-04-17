@@ -267,7 +267,7 @@ class TestDataConsistencyTest(TestCase):
         self.assertTrue(inst.equal_values([None, None], "[]"))
         self.assertTrue(inst.equal_values([None, None], "[,,]"))
         self.assertTrue(inst.equal_values([1,2], "[1,2]"))
-        self.assertTrue(inst.equal_values([1,2,3], "[1, 2, 3]"))
+        self.assertTrue(inst.equal_values([1,2,3], "[1, 3, 2]")) # sorted compare
         self.assertFalse(inst.equal_values([1,2], "[1, 2, 3]"))
         self.assertFalse(inst.equal_values([1,2,3], "[1, 2]"))
         self.assertFalse(inst.equal_values([1,2], "[1, False]"))
