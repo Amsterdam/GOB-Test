@@ -11,17 +11,19 @@ def data_consistency_test_handler(msg):
     :param msg:
     :return:
     """
-    logger.configure(msg, 'Data consistency E2E test')
-    logger.info("Start data consistency test")
-
     catalog = msg['header'].get('catalogue')
     collection = msg['header'].get('collection')
     application = msg['header'].get('application')
+    msg['header']['entity'] = msg['header'].get('entity', collection)
+
+    logger.configure(msg, 'Data consistency E2E test')
 
     assert all([catalog, collection]), "Expecting header attributes 'catalogue' and 'collection'"
-
+    id = f"{catalog} {collection} {application or ''}"
     # No return value. Results are captured by logger.
+    logger.info(f"Data consistency test {id} started")
     DataConsistencyTest(catalog, collection, application).run()
+    logger.info(f"Data consistency test {id} ended")
 
     return {
         'header': {

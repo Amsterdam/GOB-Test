@@ -29,6 +29,7 @@ class TestDataConsistencyTestHandler(TestCase):
             'header': {
                 'catalogue': 'the catalogue',
                 'collection': 'the collection',
+                'entity': 'the collection',
                 'application': 'the application',
                 'timestamp': mock_datetime.datetime.utcnow.return_value.isoformat.return_value,
             },
