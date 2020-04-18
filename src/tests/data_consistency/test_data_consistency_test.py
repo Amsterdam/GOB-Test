@@ -395,7 +395,7 @@ class TestDataConsistencyTest(TestCase):
         self.assertIsNone(inst.gob_key_errors.get('a'))
         inst._log_result(0, 0, 0, 0, 0)
         mock_logger.error.assert_not_called()
-        mock_logger.warning.assert_called_with('something wrong with a')
+        mock_logger.warning.assert_not_called()
 
         mock_logger.error.reset_mock()
         mock_logger.warning.reset_mock()

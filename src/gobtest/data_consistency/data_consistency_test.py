@@ -121,7 +121,7 @@ class DataConsistencyTest:
             logger.error(key_error)
 
         for key_warning in self.src_key_warnings.values():
-            logger.warning(key_warning)
+            logger.info(key_warning)
 
         logger.info(f"Completed data consistency test on {checked:,} rows of {cnt:,} rows total." +
                     f" {(checked - success - missing):,} rows contained errors." +
