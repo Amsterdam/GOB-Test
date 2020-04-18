@@ -8,9 +8,10 @@ from gobcore.datastore.factory import DatastoreFactory
 from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
-from gobcore.typesystem import get_gob_type_from_info, is_gob_reference_type
+from gobcore.typesystem import get_gob_type_from_info
 from gobcore.typesystem.gob_types import Reference, JSON
 from gobcore.typesystem.gob_secure_types import Secure
+from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.logging.logger import logger
 
 ANALYSE_DB = 'GOBAnalyse'
@@ -123,7 +124,7 @@ class DataConsistencyTest:
         self.src_key_warnings[attr_name] = msg
 
     def _gob_key_error(self, attr_name, msg):
-        if not attr_name in self.src_key_warnings:
+        if attr_name not in self.src_key_warnings:
             # Don't report about something already noticed in the source
             self.gob_key_errors[attr_name] = msg
 
@@ -179,7 +180,7 @@ class DataConsistencyTest:
                     # Let GOB typesystem handle formatting
                     value = type.from_value(source_row[source_mapping], **mapping).to_value
 
-                    if attr['type'].startswith('GOB.Geo'):
+                    if issubclass(type, GEOType):
                         value = self._normalise_wkt(value)
                 else:
                     self._src_key_warning(attr_name, f"Skip {attr_name} because it is missing in the input")
@@ -238,7 +239,7 @@ class DataConsistencyTest:
         :param source_row:
         :return:
         """
-        source_mapping  = mapping['source_mapping']
+        source_mapping = mapping['source_mapping']
         if isinstance(source_mapping, dict):
             for nested_gob_key, source_key in source_mapping.items():
                 # Skip values that are not found, e.g. BAG verblijfsobjecten fng_omschrijving that is set in code

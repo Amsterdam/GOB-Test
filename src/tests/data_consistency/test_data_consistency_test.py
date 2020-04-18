@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock, call
 
 from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, Reference
 from gobcore.typesystem.gob_types import ManyReference
-from gobcore.typesystem import get_gob_type_from_info
+from gobcore.typesystem import GOB, GEO
 
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition")
@@ -137,7 +137,7 @@ class TestDataConsistencyTest(TestCase):
     def test_transform_source_row(self, mock_get_gob_type):
         mock_gob_type = MagicMock()
         mock_gob_type.from_value = lambda x, **kwargs: type('Type', (), {'to_value': x})
-        mock_get_gob_type.side_effect = lambda attr: Reference if attr['type'] == 'GOB.Reference' else mock_gob_type
+        mock_get_gob_type.side_effect = lambda attr: attr['return']
 
         inst = DataConsistencyTest('cat', 'col')
         inst._normalise_wkt = lambda x: 'normalised(' + x + ')'
@@ -145,25 +145,36 @@ class TestDataConsistencyTest(TestCase):
             'all_fields': {
                 'a': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'b': {
                     'type': '',
+                    'return': GOB.JSON
                 },
                 'c': {
-                    'type': 'GOB.Reference'
+                    'type': 'GOB.Reference',
+                    'return': GOB.Reference
                 },
                 'd': {
                     'type': 'GOB.Geo.Geometry',
+                    'return': GEO.Geometry
                 },
                 'e': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'f': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'g': {
-                    'type': 'GOB.Reference'
-                }
+                    'type': 'GOB.Reference',
+                    'return': GOB.Reference
+                },
+                'h': {
+                    'type': '',
+                    'return': GOB.JSON
+                },
             }
         }
 
@@ -176,6 +187,7 @@ class TestDataConsistencyTest(TestCase):
                     'source_mapping': {
                         'b1': 'col b1',
                         'b2': 'col b2',
+                        'x': 'skip this one'
                     }
                 },
                 'c': {
@@ -194,7 +206,10 @@ class TestDataConsistencyTest(TestCase):
                         'bronwaarde': 'col g',
                         'other attr': 'should be ignored'
                     }
-                }
+                },
+                'h': {
+                    'source_mapping': 'col h',
+                },
             }
         }
 
@@ -202,16 +217,18 @@ class TestDataConsistencyTest(TestCase):
             'col a': 'val a',
             'col b1': 'val b1',
             'col b2': 'val b2',
-            'col d': 'val d',
-            'col g': 'val g'
+            'col d': 'POINT(1 2)',
+            'col g': 'val g',
+            'col h': 'this is not a json'
         }
 
         expected_result = {
             'a': 'val a',
             'b_b1': 'val b1',
             'b_b2': 'val b2',
+            'b_x': inst.SKIP_VALUE,
             'c_bronwaarde': 'd',
-            'd': 'normalised(val d)',
+            'd': 'normalised(POINT (1.000 2.000))',
             'e': inst.SKIP_VALUE,
             'f': inst.SKIP_VALUE,
             'g_bronwaarde': 'val g'
@@ -256,6 +273,13 @@ class TestDataConsistencyTest(TestCase):
         gob_type = ManyReference
         mapping['source_mapping']['bronwaarde'] = 'source attr.attr'
         source_row['source attr'] = [{'attr': 'sub value1', 'other attr': 'other sub value'}, {'attr': 'sub value2'}]
+        inst._unpack_reference(gob_type, attr_name, mapping, source_row, result)
+        self.assertEqual(result, {'reference attr_bronwaarde': ['sub value1', 'sub value2']})
+
+        # Many reference to attributes within a ';' separated string as list value
+        gob_type = ManyReference
+        mapping['source_mapping']['bronwaarde'] = 'source attr'
+        source_row['source attr'] = 'sub value1;sub value2'
         inst._unpack_reference(gob_type, attr_name, mapping, source_row, result)
         self.assertEqual(result, {'reference attr_bronwaarde': ['sub value1', 'sub value2']})
 
@@ -324,7 +348,24 @@ class TestDataConsistencyTest(TestCase):
         inst._log_result(0, 0, 0, 0, 0)
         mock_logger.error.assert_called_with('Missing key a in GOB')
 
+        # Do not print GOB key errors for attributes that are already logged for the source
         mock_logger.error.reset_mock()
+        mock_logger.warning.reset_mock()
+        inst.gob_key_errors = {}
+        inst.src_key_warnings = {
+            'a': 'something wrong with a'
+        }
+        inst._validate_row(
+            {'a': 'aa'},
+            {},
+        )
+        self.assertIsNone(inst.gob_key_errors.get('a'))
+        inst._log_result(0, 0, 0, 0, 0)
+        mock_logger.error.assert_not_called()
+        mock_logger.warning.assert_called_with('something wrong with a')
+
+        mock_logger.error.reset_mock()
+        mock_logger.warning.reset_mock()
         inst._validate_row(
             {},
             {'a': 'aa'}
