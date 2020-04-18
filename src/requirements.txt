@@ -4,3 +4,4 @@ flake8==3.7.9
 pytest==3.6.3
 pytest-cov==2.5.1
 requests==2.20.0
+xlrd==1.2.0
