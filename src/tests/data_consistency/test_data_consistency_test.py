@@ -1,10 +1,9 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, Reference
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
-
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition")
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel")
@@ -31,13 +30,31 @@ class TestDataConsistencyTestInit(TestCase):
         # Check ignore columns is set and enrich_column is appended
         self.assertTrue(len(instance.ignore_columns) > 1)
         self.assertEqual('enrich_column', instance.ignore_columns[-1])
+        self.assertTrue(FIELD.SEQNR not in instance.ignore_columns)
 
         self.assertEqual(mock_model.return_value.get_collection.return_value, instance.collection)
 
         mock_model.return_value.get_collection.assert_called_with('the cat', 'the col')
         mock_get_import_definition.assert_called_with('the cat', 'the col', 'the appl')
 
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+                'merge': {}
+            }
+        }
+        instance = DataConsistencyTest('the cat', 'the col', 'the appl')
+        self.assertTrue(instance.is_merged)
+        self.assertTrue(FIELD.SEQNR in instance.ignore_columns)
+
+
     def test_init_skip_secure_attributes(self, mock_model, mock_get_import_definition):
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+            }
+        }
+
         mock_attributes = {
             'a': {
                 'type': 'GOB.SecureString'
@@ -57,11 +74,21 @@ class TestDataConsistencyTestInit(TestCase):
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_bronwaarde'])
 
+mock_get_import_definition = MagicMock()
 
-
-@patch("gobtest.data_consistency.data_consistency_test.get_import_definition", MagicMock())
+@patch("gobtest.data_consistency.data_consistency_test.get_import_definition", mock_get_import_definition)
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel", MagicMock())
 class TestDataConsistencyTest(TestCase):
+
+    def setUp(self) -> None:
+        mock_import_definition = {
+            'source': {
+                'name': 'any name',
+                'application': 'any application',
+                'entity_id': 'any entity id'
+            }
+        }
+        mock_get_import_definition.return_value = mock_import_definition
 
     @patch("gobtest.data_consistency.data_consistency_test.ProgressTicker", MagicMock())
     @patch("gobtest.data_consistency.data_consistency_test.logger")
@@ -235,6 +262,12 @@ class TestDataConsistencyTest(TestCase):
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
+
+    def test_transform_source_value(self):
+        inst = DataConsistencyTest('cat', 'col')
+        mock_type = MagicMock()
+        mock_type.from_value.side_effect = GOBTypeException("any type exception")
+        self.assertEqual(inst._transform_source_value(mock_type, "any value", {}), "any value")
 
     def test_unpack_reference(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -436,6 +469,23 @@ WHERE
     volgnummer = 'SEQNR' AND
     _source_id = 'ID.SEQNR'
 """)
+
+        inst.is_merged = True
+        # If the dataset is merged with another dataset the sequence number is not guaranteed to match
+        # Instead the last known entity is retrieved, independent of the sequence number
+        inst._get_matching_gob_row(source_row)
+        inst.analyse_db.read.assert_called_with("""\
+SELECT
+    *
+FROM
+    cat.col
+WHERE
+    _source = 'any source' AND
+    _application = 'any application' AND
+    _source_id LIKE 'ID.%' AND
+    eind_geldigheid IS NULL
+""")
+
 
     def test_get_source_data(self):
         inst = DataConsistencyTest('cat', 'col')
