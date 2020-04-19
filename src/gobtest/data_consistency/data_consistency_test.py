@@ -23,9 +23,6 @@ class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
 
-    # If more than 5% of the requested rows is not present in GOB show error instead of warnings.
-    MISSING_THRESHOLD = 0.05
-
     default_ignore_columns = [
         'ref',
         FIELD.SOURCE,
@@ -114,7 +111,7 @@ class DataConsistencyTest:
         if gob_count != cnt:
             logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count):,})")
 
-        if checked and float(missing) / checked > self.MISSING_THRESHOLD:
+        if missing > 0:
             logger.error(f"Have {missing:,} missing rows in GOB, of {checked:,} total rows.")
 
         for key_error in self.gob_key_errors.values():
