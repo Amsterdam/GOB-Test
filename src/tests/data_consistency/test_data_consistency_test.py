@@ -125,17 +125,13 @@ class TestDataConsistencyTest(TestCase):
         mock_logger.info.assert_called_with('Completed data consistency test on 4 rows of 13 rows total. '
                                             '1 rows contained errors. 2 rows could not be found.')
 
-        # Check with higher threshold. Error should not be logged now.
-        mock_logger.error.reset_mock()
-        inst.MISSING_THRESHOLD = 0.5
-        inst.run()
-        mock_logger.error.assert_not_called()
-
         # Check count mismatch
         mock_logger.error.reset_mock()
         inst._get_gob_count = lambda: 0
         inst.run()
-        mock_logger.error.assert_called_with("Counts don't match: source 13 - GOB 0 (13)")
+        mock_logger.error.assert_any_call("Counts don't match: source 13 - GOB 0 (13)")
+        mock_logger.error.assert_any_call('Have 2 missing rows in GOB, of 4 total rows.')
+        self.assertEqual(mock_logger.error.call_count, 2)
 
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
