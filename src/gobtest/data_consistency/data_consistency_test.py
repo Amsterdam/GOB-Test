@@ -1,5 +1,6 @@
 import random
 import re
+import operator
 
 from gobcore.utils import ProgressTicker
 from gobcore.exceptions import GOBException
@@ -8,9 +9,11 @@ from gobcore.datastore.factory import DatastoreFactory
 from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
-from gobcore.typesystem import get_gob_type_from_info, is_gob_reference_type
-from gobcore.typesystem.gob_types import Reference
+from gobcore.typesystem import get_gob_type_from_info
+from gobcore.typesystem.gob_types import Reference, JSON
 from gobcore.typesystem.gob_secure_types import Secure
+from gobcore.typesystem.gob_geotypes import GEOType
+from gobcore.exceptions import GOBTypeException
 from gobcore.logging.logger import logger
 
 ANALYSE_DB = 'GOBAnalyse'
@@ -19,9 +22,6 @@ ANALYSE_DB = 'GOBAnalyse'
 class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
-
-    # If more than 5% of the requested rows is not present in GOB show error instead of warnings.
-    MISSING_THRESHOLD = 0.05
 
     default_ignore_columns = [
         'ref',
@@ -55,9 +55,15 @@ class DataConsistencyTest:
         self.entity_id_field = self.source['entity_id']
         self.has_states = self.collection.get('has_states', False)
         self.gob_key_errors = {}
+        self.src_key_warnings = {}
+        self.is_merged = self.source.get('merge') is not None
 
         # Ignore enriched attributes by default
         self.ignore_columns = self.default_ignore_columns + list(self.source.get('enrich', {}).keys())
+
+        # If the dataset is merged with another dataset the seqnr might be altered
+        if self.is_merged:
+            self.ignore_columns.append(FIELD.SEQNR)
 
         # Ignore secure columns to prevent leakage of private data
         for attribute, type_info in self.collection['attributes'].items():
@@ -105,15 +111,26 @@ class DataConsistencyTest:
         if gob_count != cnt:
             logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count):,})")
 
-        if checked and float(missing) / checked > self.MISSING_THRESHOLD:
+        if missing > 0:
             logger.error(f"Have {missing:,} missing rows in GOB, of {checked:,} total rows.")
 
         for key_error in self.gob_key_errors.values():
             logger.error(key_error)
 
+        for key_warning in self.src_key_warnings.values():
+            logger.info(key_warning)
+
         logger.info(f"Completed data consistency test on {checked:,} rows of {cnt:,} rows total." +
                     f" {(checked - success - missing):,} rows contained errors." +
                     f" {missing:,} rows could not be found.")
+
+    def _src_key_warning(self, attr_name, msg):
+        self.src_key_warnings[attr_name] = msg
+
+    def _gob_key_error(self, attr_name, msg):
+        if attr_name not in self.src_key_warnings:
+            # Don't report about something already noticed in the source
+            self.gob_key_errors[attr_name] = msg
 
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
@@ -137,6 +154,27 @@ class DataConsistencyTest:
         fltval = re.sub(r'(\d+)(\.\d+)', r'\g<1>', comma)
         return fltval
 
+    def _transform_source_value(self, type, value, mapping):
+        """
+        Transform the source value so that it can be compared with the GOB value
+
+        :param type:
+        :param value:
+        :param mapping:
+        :return:
+        """
+        try:
+            # Let GOB typesystem handle formatting
+            value = type.from_value(value, **mapping).to_value
+        except GOBTypeException:
+            # Stick with the raw source value
+            pass
+        else:
+            # No exception
+            if issubclass(type, GEOType):
+                value = self._normalise_wkt(value)
+        return value
+
     def _transform_source_row(self, source_row: dict):
         """Transforms rows from source database to the format the row should appear in the analyse database, based on
         the GOBModel and import definition mapping.
@@ -153,27 +191,42 @@ class DataConsistencyTest:
 
             if mapping is None:
                 value = self.SKIP_VALUE
+                self._src_key_warning(attr_name, f"Skip {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping['source_mapping']
                 type = get_gob_type_from_info(attr)
-                if is_gob_reference_type(attr['type']):
+                if issubclass(type, Reference):
                     self._unpack_reference(type, attr_name, mapping, source_row, result)
                     continue
-                elif isinstance(source_mapping, dict):
+                elif issubclass(type, JSON):
                     self._unpack_json(attr_name, mapping, source_row, result)
                     continue
                 elif source_mapping in source_row:
-                    # Let GOB typesystem handle formatting
-                    value = type.from_value(source_row[source_mapping], **mapping).to_value
-
-                    if attr['type'].startswith('GOB.Geo'):
-                        value = self._normalise_wkt(value)
+                    value = self._transform_source_value(type, source_row[source_mapping], mapping)
                 else:
+                    self._src_key_warning(attr_name, f"Skip {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
 
             result[attr_name] = value
 
         return result
+
+    def _unpack_string_list(self, s):
+        """
+        Unpack a string as a list
+
+        Take the separator as being the character that occurs the most in the given string
+        from a list a possible separators
+
+        :param s:
+        :return:
+        """
+        # Count the number of occurences for each possible separator
+        counts = {sep: s.count(sep) for sep in [';', ',', ':']}
+        # Take the separator with the highest count
+        separator = max(counts.items(), key=operator.itemgetter(1))[0]
+        # Return a list from the string splitted on the separator and each value trimmed
+        return [v.strip() for v in s.split(separator)]
 
     def _unpack_reference(self, gob_type, attr_name, mapping, source_row, result):
         """
@@ -208,6 +261,9 @@ class DataConsistencyTest:
             dst_value = value[attr] if attr else value
         else:
             # many reference (list) value
+            if value and not isinstance(value, list):
+                # Unpack the value as a string that represents an array
+                value = self._unpack_string_list(str(value))
             dst_value = [item[attr] if attr else item for item in value] if value else []
 
         result[dst_key] = dst_value
@@ -221,9 +277,15 @@ class DataConsistencyTest:
         :param source_row:
         :return:
         """
-        for nested_gob_key, source_key in mapping['source_mapping'].items():
-            dst_key = f'{attr_name}_{nested_gob_key}'
-            result[dst_key] = source_row[source_key]
+        source_mapping = mapping['source_mapping']
+        if isinstance(source_mapping, dict):
+            for nested_gob_key, source_key in source_mapping.items():
+                # Skip values that are not found, e.g. BAG verblijfsobjecten fng_omschrijving that is set in code
+                dst_key = f'{attr_name}_{nested_gob_key}'
+                result[dst_key] = source_row.get(source_key, self.SKIP_VALUE)
+        else:
+            # Skip JSON's that are not imported per attribute
+            self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non-JSON")
 
     def _transform_gob_row(self, gob_row: dict):
 
@@ -247,6 +309,11 @@ class DataConsistencyTest:
             f"{FIELD.SOURCE} = '{source}'",
             f"{FIELD.APPLICATION} = '{application}'"
         ] + (where or [])
+
+        if self.has_states and self.is_merged:
+            # Take only the most recent entities to compare
+            where.append(f"{FIELD.END_VALIDITY} IS NULL")
+
         where = " AND\n    ".join(where)
         return f"""\
 SELECT
@@ -283,7 +350,9 @@ WHERE
             src_value = ','.join(sorted([str(v).strip() for v in src_value if v is not None]))
             # Rebuild the GOB list from the string, skipping empty values
             gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v]))
-        return str(src_value) == str(gob_value)
+            return src_value == gob_value
+        else:
+            return str(src_value) == str(gob_value)
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
         expected_values = self._transform_source_row(source_row)
@@ -296,7 +365,7 @@ WHERE
             try:
                 gob_value = gob_row.pop(attr)
             except KeyError:
-                self.gob_key_errors[attr] = f"Missing key {attr} in GOB"
+                self._gob_key_error(attr, f"Missing key {attr} in GOB")
                 continue
 
             if value != self.SKIP_VALUE and not self.equal_values(value, gob_value):
@@ -334,15 +403,21 @@ WHERE
         source_id = source_row[source_def['entity_id']]
 
         where = []
+        # Compare source ids on equality (=)
+        is_source_id = "="
         if self.has_states:
-            seq_nr = source_row[self.import_definition['gob_mapping'][FIELD.SEQNR]['source_mapping']]
-            # Select matching sequence number
-            where.append(f"{FIELD.SEQNR} = '{seq_nr}'")
-            # GOB populates the source_id with the sequence number
-            source_id = f"{source_id}.{seq_nr}"
+            if self.is_merged:
+                source_id = f"{source_id}.%"
+                # Compare source ids with wildcard comparison for the sequence number
+                is_source_id = "LIKE"
+            else:
+                seq_nr = source_row[self.import_definition['gob_mapping'][FIELD.SEQNR]['source_mapping']]
+                # Select matching sequence number
+                where.append(f"{FIELD.SEQNR} = '{seq_nr}'")
+                # GOB populates the source_id with the sequence number
+                source_id = f"{source_id}.{seq_nr}"
 
-        # select matching source id
-        where.append(f"{FIELD.SOURCE_ID} = '{source_id}'")
+        where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
         query = self._select_from_gob_query(select="*", where=where)
         result = self.analyse_db.read(query)

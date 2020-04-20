@@ -1,10 +1,9 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, Reference
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD
 from gobcore.typesystem.gob_types import ManyReference
-from gobcore.typesystem import get_gob_type_from_info
-
+from gobcore.typesystem import GOB, GEO
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition")
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel")
@@ -31,13 +30,31 @@ class TestDataConsistencyTestInit(TestCase):
         # Check ignore columns is set and enrich_column is appended
         self.assertTrue(len(instance.ignore_columns) > 1)
         self.assertEqual('enrich_column', instance.ignore_columns[-1])
+        self.assertTrue(FIELD.SEQNR not in instance.ignore_columns)
 
         self.assertEqual(mock_model.return_value.get_collection.return_value, instance.collection)
 
         mock_model.return_value.get_collection.assert_called_with('the cat', 'the col')
         mock_get_import_definition.assert_called_with('the cat', 'the col', 'the appl')
 
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+                'merge': {}
+            }
+        }
+        instance = DataConsistencyTest('the cat', 'the col', 'the appl')
+        self.assertTrue(instance.is_merged)
+        self.assertTrue(FIELD.SEQNR in instance.ignore_columns)
+
+
     def test_init_skip_secure_attributes(self, mock_model, mock_get_import_definition):
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+            }
+        }
+
         mock_attributes = {
             'a': {
                 'type': 'GOB.SecureString'
@@ -57,11 +74,21 @@ class TestDataConsistencyTestInit(TestCase):
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_bronwaarde'])
 
+mock_get_import_definition = MagicMock()
 
-
-@patch("gobtest.data_consistency.data_consistency_test.get_import_definition", MagicMock())
+@patch("gobtest.data_consistency.data_consistency_test.get_import_definition", mock_get_import_definition)
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel", MagicMock())
 class TestDataConsistencyTest(TestCase):
+
+    def setUp(self) -> None:
+        mock_import_definition = {
+            'source': {
+                'name': 'any name',
+                'application': 'any application',
+                'entity_id': 'any entity id'
+            }
+        }
+        mock_get_import_definition.return_value = mock_import_definition
 
     @patch("gobtest.data_consistency.data_consistency_test.ProgressTicker", MagicMock())
     @patch("gobtest.data_consistency.data_consistency_test.logger")
@@ -98,17 +125,13 @@ class TestDataConsistencyTest(TestCase):
         mock_logger.info.assert_called_with('Completed data consistency test on 4 rows of 13 rows total. '
                                             '1 rows contained errors. 2 rows could not be found.')
 
-        # Check with higher threshold. Error should not be logged now.
-        mock_logger.error.reset_mock()
-        inst.MISSING_THRESHOLD = 0.5
-        inst.run()
-        mock_logger.error.assert_not_called()
-
         # Check count mismatch
         mock_logger.error.reset_mock()
         inst._get_gob_count = lambda: 0
         inst.run()
-        mock_logger.error.assert_called_with("Counts don't match: source 13 - GOB 0 (13)")
+        mock_logger.error.assert_any_call("Counts don't match: source 13 - GOB 0 (13)")
+        mock_logger.error.assert_any_call('Have 2 missing rows in GOB, of 4 total rows.')
+        self.assertEqual(mock_logger.error.call_count, 2)
 
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -137,7 +160,7 @@ class TestDataConsistencyTest(TestCase):
     def test_transform_source_row(self, mock_get_gob_type):
         mock_gob_type = MagicMock()
         mock_gob_type.from_value = lambda x, **kwargs: type('Type', (), {'to_value': x})
-        mock_get_gob_type.side_effect = lambda attr: Reference if attr['type'] == 'GOB.Reference' else mock_gob_type
+        mock_get_gob_type.side_effect = lambda attr: attr['return']
 
         inst = DataConsistencyTest('cat', 'col')
         inst._normalise_wkt = lambda x: 'normalised(' + x + ')'
@@ -145,25 +168,36 @@ class TestDataConsistencyTest(TestCase):
             'all_fields': {
                 'a': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'b': {
                     'type': '',
+                    'return': GOB.JSON
                 },
                 'c': {
-                    'type': 'GOB.Reference'
+                    'type': 'GOB.Reference',
+                    'return': GOB.Reference
                 },
                 'd': {
                     'type': 'GOB.Geo.Geometry',
+                    'return': GEO.Geometry
                 },
                 'e': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'f': {
                     'type': '',
+                    'return': GOB.String
                 },
                 'g': {
-                    'type': 'GOB.Reference'
-                }
+                    'type': 'GOB.Reference',
+                    'return': GOB.Reference
+                },
+                'h': {
+                    'type': '',
+                    'return': GOB.JSON
+                },
             }
         }
 
@@ -176,6 +210,7 @@ class TestDataConsistencyTest(TestCase):
                     'source_mapping': {
                         'b1': 'col b1',
                         'b2': 'col b2',
+                        'x': 'skip this one'
                     }
                 },
                 'c': {
@@ -194,7 +229,10 @@ class TestDataConsistencyTest(TestCase):
                         'bronwaarde': 'col g',
                         'other attr': 'should be ignored'
                     }
-                }
+                },
+                'h': {
+                    'source_mapping': 'col h',
+                },
             }
         }
 
@@ -202,22 +240,30 @@ class TestDataConsistencyTest(TestCase):
             'col a': 'val a',
             'col b1': 'val b1',
             'col b2': 'val b2',
-            'col d': 'val d',
-            'col g': 'val g'
+            'col d': 'POINT(1 2)',
+            'col g': 'val g',
+            'col h': 'this is not a json'
         }
 
         expected_result = {
             'a': 'val a',
             'b_b1': 'val b1',
             'b_b2': 'val b2',
+            'b_x': inst.SKIP_VALUE,
             'c_bronwaarde': 'd',
-            'd': 'normalised(val d)',
+            'd': 'normalised(POINT (1.000 2.000))',
             'e': inst.SKIP_VALUE,
             'f': inst.SKIP_VALUE,
             'g_bronwaarde': 'val g'
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
+
+    def test_transform_source_value(self):
+        inst = DataConsistencyTest('cat', 'col')
+        mock_type = MagicMock()
+        mock_type.from_value.side_effect = GOBTypeException("any type exception")
+        self.assertEqual(inst._transform_source_value(mock_type, "any value", {}), "any value")
 
     def test_unpack_reference(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -259,6 +305,13 @@ class TestDataConsistencyTest(TestCase):
         inst._unpack_reference(gob_type, attr_name, mapping, source_row, result)
         self.assertEqual(result, {'reference attr_bronwaarde': ['sub value1', 'sub value2']})
 
+        # Many reference to attributes within a ';' separated string as list value
+        gob_type = ManyReference
+        mapping['source_mapping']['bronwaarde'] = 'source attr'
+        source_row['source attr'] = 'sub value1;sub value2'
+        inst._unpack_reference(gob_type, attr_name, mapping, source_row, result)
+        self.assertEqual(result, {'reference attr_bronwaarde': ['sub value1', 'sub value2']})
+
     def test_equal_values(self):
         inst = DataConsistencyTest('cat', 'col')
         for value in 1, True, 2.5, "any string":
@@ -274,6 +327,8 @@ class TestDataConsistencyTest(TestCase):
         self.assertTrue(inst.equal_values([1,False], "[1, False]"))
         self.assertTrue(inst.equal_values([1,2.5], "[1, 2.5]"))
         self.assertTrue(inst.equal_values([0,2.5], "[0, 2.5]"))
+        self.assertFalse(inst.equal_values("aap noot mies", "aap noot"))
+        self.assertFalse(inst.equal_values("aap noot", "aap noot mies"))
 
     def test_transform_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -324,7 +379,24 @@ class TestDataConsistencyTest(TestCase):
         inst._log_result(0, 0, 0, 0, 0)
         mock_logger.error.assert_called_with('Missing key a in GOB')
 
+        # Do not print GOB key errors for attributes that are already logged for the source
         mock_logger.error.reset_mock()
+        mock_logger.warning.reset_mock()
+        inst.gob_key_errors = {}
+        inst.src_key_warnings = {
+            'a': 'something wrong with a'
+        }
+        inst._validate_row(
+            {'a': 'aa'},
+            {},
+        )
+        self.assertIsNone(inst.gob_key_errors.get('a'))
+        inst._log_result(0, 0, 0, 0, 0)
+        mock_logger.error.assert_not_called()
+        mock_logger.warning.assert_not_called()
+
+        mock_logger.error.reset_mock()
+        mock_logger.warning.reset_mock()
         inst._validate_row(
             {},
             {'a': 'aa'}
@@ -395,6 +467,23 @@ WHERE
     volgnummer = 'SEQNR' AND
     _source_id = 'ID.SEQNR'
 """)
+
+        inst.is_merged = True
+        # If the dataset is merged with another dataset the sequence number is not guaranteed to match
+        # Instead the last known entity is retrieved, independent of the sequence number
+        inst._get_matching_gob_row(source_row)
+        inst.analyse_db.read.assert_called_with("""\
+SELECT
+    *
+FROM
+    cat.col
+WHERE
+    _source = 'any source' AND
+    _application = 'any application' AND
+    _source_id LIKE 'ID.%' AND
+    eind_geldigheid IS NULL
+""")
+
 
     def test_get_source_data(self):
         inst = DataConsistencyTest('cat', 'col')
