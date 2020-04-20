@@ -86,6 +86,7 @@ class DataConsistencyTest:
         missing = 0
 
         gob_count = self._get_gob_count()
+        logger.info(f"Aantal {self.catalog_name} {self.collection_name} in GOB: {gob_count:,}")
 
         with ProgressTicker(f"Compare data ({gob_count:,})", 10000) as progress:
             for row in rows:
@@ -105,6 +106,7 @@ class DataConsistencyTest:
 
                 cnt += 1
 
+        logger.info(f"Aantal {self.catalog_name} {self.collection_name} in source: {cnt:,}")
         self._log_result(checked, cnt, gob_count, missing, success)
 
     def _log_result(self, checked, cnt, gob_count, missing, success):
@@ -118,7 +120,7 @@ class DataConsistencyTest:
             logger.error(key_error)
 
         for key_warning in self.src_key_warnings.values():
-            logger.info(key_warning)
+            logger.warning(key_warning)
 
         logger.info(f"Completed data consistency test on {checked:,} rows of {cnt:,} rows total." +
                     f" {(checked - success - missing):,} rows contained errors." +
@@ -352,7 +354,10 @@ WHERE
             gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v]))
             return src_value == gob_value
         else:
-            return str(src_value) == str(gob_value)
+            # Compare the two values as string without whitespace, case-insensitive
+            gob_value = re.sub(r"\s+", "", str(gob_value)).lower()
+            src_value = re.sub(r"\s+", "", str(src_value)).lower()
+            return gob_value == src_value
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
         expected_values = self._transform_source_row(source_row)
