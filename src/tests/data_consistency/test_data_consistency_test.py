@@ -329,6 +329,7 @@ class TestDataConsistencyTest(TestCase):
         self.assertTrue(inst.equal_values([0,2.5], "[0, 2.5]"))
         self.assertFalse(inst.equal_values("aap noot mies", "aap noot"))
         self.assertFalse(inst.equal_values("aap noot", "aap noot mies"))
+        self.assertTrue(inst.equal_values("  Aap \t nOOt \n", "aap noot"))
 
     def test_transform_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -393,7 +394,7 @@ class TestDataConsistencyTest(TestCase):
         self.assertIsNone(inst.gob_key_errors.get('a'))
         inst._log_result(0, 0, 0, 0, 0)
         mock_logger.error.assert_not_called()
-        mock_logger.warning.assert_not_called()
+        mock_logger.warning.assert_called_with('something wrong with a')
 
         mock_logger.error.reset_mock()
         mock_logger.warning.reset_mock()
