@@ -327,6 +327,8 @@ class TestDataConsistencyTest(TestCase):
         self.assertTrue(inst.equal_values([1,False], "[1, False]"))
         self.assertTrue(inst.equal_values([1,2.5], "[1, 2.5]"))
         self.assertTrue(inst.equal_values([0,2.5], "[0, 2.5]"))
+        self.assertFalse(inst.equal_values("aap noot mies", "aap noot"))
+        self.assertFalse(inst.equal_values("aap noot", "aap noot mies"))
 
     def test_transform_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')

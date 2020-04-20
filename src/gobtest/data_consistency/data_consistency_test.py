@@ -351,14 +351,8 @@ WHERE
             # Rebuild the GOB list from the string, skipping empty values
             gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v]))
             return src_value == gob_value
-        elif str(src_value) == str(gob_value):
-            return True
         else:
-            # Probably the source value has been truncated or manipulated
-            # Check that the current gob value is not empty and part of the original source value
-            gob_value = re.sub(r"\s+", "", str(gob_value)).lower()
-            src_value = re.sub(r"\s+", "", str(src_value)).lower()
-            return gob_value and gob_value in src_value
+            return str(src_value) == str(gob_value)
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
         expected_values = self._transform_source_row(source_row)
