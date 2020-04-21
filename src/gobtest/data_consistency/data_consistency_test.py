@@ -287,7 +287,7 @@ class DataConsistencyTest:
                 result[dst_key] = source_row.get(source_key, self.SKIP_VALUE)
         else:
             # Skip JSON's that are not imported per attribute
-            self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non-JSON")
+            self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non- or empty-JSON")
 
     def _transform_gob_row(self, gob_row: dict):
 
