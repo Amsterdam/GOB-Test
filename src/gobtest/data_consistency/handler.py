@@ -16,7 +16,7 @@ def data_consistency_test_handler(msg):
     application = msg['header'].get('application')
     msg['header']['entity'] = msg['header'].get('entity', collection)
 
-    logger.configure(msg, 'Data consistency E2E test')
+    logger.configure(msg, 'Data consistency test')
 
     assert all([catalog, collection]), "Expecting header attributes 'catalogue' and 'collection'"
     id = f"{catalog} {collection} {application or ''}"
