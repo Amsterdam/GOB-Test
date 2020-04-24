@@ -362,13 +362,15 @@ WHERE
             src_value = re.sub(r"\s+", "", str(src_value)).lower()
             return gob_value == src_value
 
-    def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
-        expected_values = self._transform_source_row(source_row)
+    def _register_compared_columns(self, columns):
         if not self.compared_columns:
             # Register the columns that have been compared
-            self.compared_columns = expected_values.keys()
-        gob_row = self._transform_gob_row(gob_row)
+            self.compared_columns = columns
 
+    def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
+        expected_values = self._transform_source_row(source_row)
+        self._register_compared_columns(expected_values.keys())
+        gob_row = self._transform_gob_row(gob_row)
         start_error_cnt = len(logger.get_errors())
 
         mismatches = []
