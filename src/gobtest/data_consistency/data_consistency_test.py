@@ -57,6 +57,7 @@ class DataConsistencyTest:
         self.gob_key_errors = {}
         self.src_key_warnings = {}
         self.is_merged = self.source.get('merge') is not None
+        self.compared_columns = []
 
         # Ignore enriched attributes by default
         self.ignore_columns = self.default_ignore_columns + list(self.source.get('enrich', {}).keys())
@@ -107,6 +108,8 @@ class DataConsistencyTest:
                 cnt += 1
 
         logger.info(f"Aantal {self.catalog_name} {self.collection_name} in source: {cnt:,}")
+        logger.info(f"Ignored columns: {', '.join(self.ignore_columns)}")
+        logger.info(f"Compared columns: {', '.join(self.compared_columns)}")
         self._log_result(checked, cnt, gob_count, missing, success)
 
     def _log_result(self, checked, cnt, gob_count, missing, success):
@@ -193,7 +196,7 @@ class DataConsistencyTest:
 
             if mapping is None:
                 value = self.SKIP_VALUE
-                self._src_key_warning(attr_name, f"Skip {attr_name} because no mapping is found")
+                self._src_key_warning(attr_name, f"Skipped {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping['source_mapping']
                 type = get_gob_type_from_info(attr)
@@ -206,7 +209,7 @@ class DataConsistencyTest:
                 elif source_mapping in source_row:
                     value = self._transform_source_value(type, source_row[source_mapping], mapping)
                 else:
-                    self._src_key_warning(attr_name, f"Skip {attr_name} because it is missing in the input")
+                    self._src_key_warning(attr_name, f"Skipped {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
 
             result[attr_name] = value
@@ -361,6 +364,9 @@ WHERE
 
     def _validate_row(self, source_row: dict, gob_row: dict) -> bool:
         expected_values = self._transform_source_row(source_row)
+        if not self.compared_columns:
+            # Register the columns that have been compared
+            self.compared_columns = expected_values.keys()
         gob_row = self._transform_gob_row(gob_row)
 
         start_error_cnt = len(logger.get_errors())
