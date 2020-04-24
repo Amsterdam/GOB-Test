@@ -20,7 +20,7 @@ class TestDataConsistencyTestHandler(TestCase):
         res = data_consistency_test_handler(msg)
 
         # Assert logger configured
-        mock_logger.configure.assert_called_with(msg, 'Data consistency E2E test')
+        mock_logger.configure.assert_called_with(msg, 'Data consistency test')
 
         mock_test.assert_called_with('the catalogue', 'the collection', 'the application')
         mock_test.return_value.run.assert_called_once()
