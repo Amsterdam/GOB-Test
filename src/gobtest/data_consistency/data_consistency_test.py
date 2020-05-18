@@ -1,10 +1,11 @@
 import random
 import re
 import operator
+from functools import reduce
 
 from gobcore.utils import ProgressTicker
 from gobcore.exceptions import GOBException
-from gobconfig.import_.import_config import get_import_definition
+from gobconfig.import_.import_config import get_import_definition, get_import_definition_by_filename
 from gobcore.datastore.factory import DatastoreFactory
 from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
@@ -85,6 +86,8 @@ class DataConsistencyTest:
         checked = 0
         success = 0
         missing = 0
+        merge_ids = []
+        merge_id = self.source.get('merge', {}).get('on')
 
         gob_count = self._get_gob_count()
         logger.info(f"Aantal {self.catalog_name} {self.collection_name} in GOB: {gob_count:,}")
@@ -107,10 +110,65 @@ class DataConsistencyTest:
 
                 cnt += 1
 
+                if merge_id:
+                    merge_ids.append(row[merge_id])
+
+        if self.is_merged:
+            cnt = self._get_expected_merge_cnt(merge_ids)
+
         logger.info(f"Aantal {self.catalog_name} {self.collection_name} in source: {cnt:,}")
         logger.info(f"Ignored columns: {', '.join(self.ignore_columns)}")
         logger.info(f"Compared columns: {', '.join(self.compared_columns)}")
+
         self._log_result(checked, cnt, gob_count, missing, success)
+
+    def _get_expected_merge_cnt(self, merge_ids: list):
+        merge_def = self.source.get('merge')
+
+        merge_objects = self._get_merge_data()
+
+        if merge_def.get('id') == 'diva_into_dgdialog':
+            """The diva_into_dgdialog merge method merges the last states from DIVA into the first state of DGDialog.
+            DGDialog is the main source, DIVA is the merged source.
+
+            This means that we're expecting to have:
+            1. ALL DGDialog objects and states, plus
+            2. All states from the merged collection, minus the states that were merged with DGDialog states.
+
+            Regarding 2, this means that for all objects in the merged data:
+            - If the object is present in DGDialog, we add number_of_states_DIVA(object) - 1, because the last state
+              was merged.
+            - If the object is not present in DGDialog, we add number_of_states_DIVA(object)
+
+            If DGDialog has objects (with states) A1, A2, B1, B2, C1
+            And DIVA has A1, A2, B1, D1
+
+            A2(DIVA) will be merged with A1(DGDialog), so we have A1(DIVA), A1(DGDialog), A2(DGDialog)
+            B1(DIVA) will be merged with B1(DGDialog), so we have B1(DGDialog)
+            C1 only exists in DGDialog, so we have C1(DGDialog)
+            D1 only exists in DIVA, so we have D1(DIVA)
+
+            We end up with a count of:
+            - All objects and states in DGDialog: A1, A2, B1, B2 and C1 totals 5
+            - Plus number_of_states_DIVA(object) - 1 for all objects that match DGDialog. This is the case for objects
+              A and B (2 - 1) + (1 - 1) = 1
+            - Plus number_of_states_DIVA(object) for all objects that don't match DGDialog. This is the case for object
+              D, so we add a count of 1.
+
+            The expected number of rows in GOB is thus 5 + 1 + 1 = 7.
+
+            The example described here is also implemented as a test.
+            """
+            on = merge_def.get('on')
+
+            # Collect id's with counts from merged data, where id is the field that is used to match the two sources
+            ids = reduce(lambda x, y: x.update({y[on]: x.get(y[on], 0) + 1}) or x, merge_objects, {})
+
+            expected_cnt = len(merge_ids) + sum([cnt if id not in merge_ids else cnt - 1 for id, cnt in ids.items()])
+
+            return expected_cnt
+        else:
+            raise NotImplementedError(f"Merge id {merge_def.get('id')} not implemented")
 
     def _log_result(self, checked, cnt, gob_count, missing, success):
         if gob_count != cnt:
@@ -312,12 +370,9 @@ class DataConsistencyTest:
 
         where = [
             f"{FIELD.SOURCE} = '{source}'",
-            f"{FIELD.APPLICATION} = '{application}'"
+            f"{FIELD.APPLICATION} = '{application}'",
+            f"{FIELD.DATE_DELETED} IS NULL"
         ] + (where or [])
-
-        if self.has_states and self.is_merged:
-            # Take only the most recent entities to compare
-            where.append(f"{FIELD.END_VALIDITY} IS NULL")
 
         where = " AND\n    ".join(where)
         return f"""\
@@ -439,6 +494,21 @@ WHERE
 
     def _get_source_data(self):
         return self.src_datastore.query("\n".join(self.source.get('query', [])))
+
+    def _get_merge_data(self):
+        """Returns the data from the merge source for this import
+
+        :return:
+        """
+        assert self.source.get('merge'), "Called _connect_merge_source without merge definition"
+
+        merge_config = get_import_definition_by_filename(self.source['merge']['dataset'])
+        merge_source = merge_config['source']
+
+        merge_connection = DatastoreFactory.get_datastore(get_datastore_config(merge_source['application']),
+                                                          merge_source.get('read_config', {}))
+        merge_connection.connect()
+        return merge_connection.query("\n".join(merge_source.get('query', [])))
 
     def _connect(self):
         datastore_config = self.source.get('application_config') or get_datastore_config(self.source['application'])

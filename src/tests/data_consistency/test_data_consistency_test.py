@@ -133,6 +133,80 @@ class TestDataConsistencyTest(TestCase):
         mock_logger.error.assert_any_call('Have 2 missing rows in GOB, of 4 total rows.')
         self.assertEqual(mock_logger.error.call_count, 2)
 
+    @patch("gobtest.data_consistency.data_consistency_test.ProgressTicker", MagicMock())
+    @patch("gobtest.data_consistency.data_consistency_test.logger")
+    @patch("gobtest.data_consistency.data_consistency_test.random")
+    def test_run_merged_dataset(self, mock_random, mock_logger):
+        mock_random.randint.return_value = 2
+        inst = DataConsistencyTest('cat', 'col', 'appl')
+        inst.SAMPLE_SIZE = 0.25
+        inst._connect = MagicMock()
+        inst.has_states = False
+        inst._get_row_id = lambda x: 'row id'
+        inst.source = {
+            'merge': {
+                'on': 'id'
+            }
+        }
+        inst.is_merged = True
+        inst._get_expected_merge_cnt = MagicMock(return_value=13)
+        inst._get_matching_gob_row = MagicMock(side_effect=lambda x: {'id': x['id'] * 2} if x['id'] * 2 % 10 != 0 else None)
+        inst._validate_row = MagicMock(side_effect=lambda x, y: x['id'] % 6 == 0)
+        inst._get_source_data = MagicMock(return_value=[{'id': x} for x in [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+        ]])
+        inst._get_gob_count = lambda: 13
+
+        inst.run()
+        mock_random.randint.assert_called_with(0, 3)
+        inst._get_matching_gob_row.assert_has_calls([
+            call({'id': 0}),
+            call({'id': 2}),
+            call({'id': 6}),
+            call({'id': 10}),
+        ])
+        inst._validate_row.assert_has_calls([
+            call({'id': 2}, {'id': 4}),
+            call({'id': 6}, {'id': 12}),
+        ])
+
+        mock_logger.warning.assert_called_with('Row with id row id missing')
+        mock_logger.error.assert_called_with('Have 2 missing rows in GOB, of 4 total rows.')
+        mock_logger.info.assert_called_with('Completed data consistency test on 4 rows of 13 rows total. '
+                                            '1 rows contained errors. 2 rows could not be found.')
+
+        inst._get_expected_merge_cnt.assert_called_with([x for x in range(13)])
+
+    def test_get_expected_merge_cnt_diva_into_dgdialog(self):
+        """Tests the case as commented in the tested method
+
+        :return:
+        """
+        inst = DataConsistencyTest('cat', 'col', 'appl')
+        inst.source = {
+            'merge': {
+                'dataset': 'some dataset',
+                'id': 'diva_into_dgdialog',
+                'on': 'somefield'
+            }
+        }
+
+        # Alias is not used. Just a convenience attribute to be able to follow the example in the method comments
+        inst._get_merge_data = MagicMock(return_value=[
+            {'somefield': 'A', 'alias': 'A1'},
+            {'somefield': 'A', 'alias': 'A2'},
+            {'somefield': 'B', 'alias': 'B1'},
+            {'somefield': 'D', 'alias': 'D1'},
+        ])
+        merge_ids = ['A', 'A', 'B', 'B', 'C']
+        self.assertEqual(7, inst._get_expected_merge_cnt(merge_ids))
+
+        # Test NotImplemented case
+        inst.source['merge']['id'] = 'nonexistent'
+
+        with self.assertRaises(NotImplementedError):
+            inst._get_expected_merge_cnt(merge_ids)
+
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
         inst.analyse_db = MagicMock()
@@ -465,6 +539,7 @@ FROM
 WHERE
     _source = 'any source' AND
     _application = 'any application' AND
+    _date_deleted IS NULL AND
     volgnummer = 'SEQNR' AND
     _source_id = 'ID.SEQNR'
 """)
@@ -481,10 +556,9 @@ FROM
 WHERE
     _source = 'any source' AND
     _application = 'any application' AND
-    _source_id LIKE 'ID.%' AND
-    eind_geldigheid IS NULL
+    _date_deleted IS NULL AND
+    _source_id LIKE 'ID.%'
 """)
-
 
     def test_get_source_data(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -495,6 +569,31 @@ WHERE
 
         self.assertEqual(inst.src_datastore.query.return_value, inst._get_source_data())
         inst.src_datastore.query.assert_called_with('a\nb\nc')
+
+    @patch("gobtest.data_consistency.data_consistency_test.DatastoreFactory")
+    @patch("gobtest.data_consistency.data_consistency_test.get_datastore_config", lambda x: x + '_CONFIG')
+    @patch("gobtest.data_consistency.data_consistency_test.get_import_definition_by_filename")
+    def test_get_merge_data(self, mock_get_import_definition, mock_factory):
+        mock_get_import_definition.return_value = {
+            'source': {
+                'application': 'APPLICATION',
+                'read_config': 'THE READ CONFIG',
+                'query': ['SOME QUERY']
+            },
+        }
+
+        inst = DataConsistencyTest('cat', 'col')
+        inst.source = {
+            'merge': {
+                'dataset': 'somedatasetfile.json'
+            }
+        }
+
+        result = inst._get_merge_data()
+        mock_factory.get_datastore.assert_called_with('APPLICATION_CONFIG', 'THE READ CONFIG')
+        mock_factory.get_datastore().query.assert_called_with('SOME QUERY')
+        mock_factory.get_datastore().connect.assert_called_once()
+        self.assertEqual(mock_factory.get_datastore().query(), result)
 
     def test_gob_count(self):
         inst = DataConsistencyTest('cat', 'col')
