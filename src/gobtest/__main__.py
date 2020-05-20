@@ -43,7 +43,7 @@ SERVICEDEFINITION = {
 
 def init():
     if __name__ == "__main__":
-        messagedriven_service(SERVICEDEFINITION, "Test")
+        messagedriven_service(SERVICEDEFINITION, "Test", {"thread_per_service": True})
 
 
 init()
