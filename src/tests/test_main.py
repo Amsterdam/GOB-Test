@@ -11,4 +11,4 @@ class TestMain(TestCase):
         from gobtest import __main__ as module
         with patch.object(module, "__name__", "__main__"):
             module.init()
-            mock_messagedriven_service.assert_called_with(SERVICEDEFINITION, "Test")
+            mock_messagedriven_service.assert_called_with(SERVICEDEFINITION, "Test", {"thread_per_service": True})
