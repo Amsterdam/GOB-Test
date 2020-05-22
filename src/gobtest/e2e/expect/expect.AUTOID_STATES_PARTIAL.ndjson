@@ -1,0 +1,4 @@
+{"volgnummer": 1, "registratiedatum": null, "identificatie": "10", "beginGeldigheid": "1999-01-01T00:00:00", "eindGeldigheid": "1999-01-02T00:00:00", "code": "idx1", "autoid": "123400016", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid_states/10/"}}}
+{"volgnummer": 2, "registratiedatum": null, "identificatie": "10", "beginGeldigheid": "1999-01-01T00:00:00", "eindGeldigheid": "1999-01-02T00:00:00", "code": "idx1", "autoid": "123400016", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid_states/10/"}}}
+{"volgnummer": 3, "registratiedatum": null, "identificatie": "10", "beginGeldigheid": "1999-01-01T00:00:00", "eindGeldigheid": "1999-01-02T00:00:00", "code": "idx1", "autoid": "123400016", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid_states/10/"}}}
+
