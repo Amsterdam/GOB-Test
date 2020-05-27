@@ -1,7 +1,7 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from gobtest.__main__ import SERVICEDEFINITION
+from gobtest.__main__ import SERVICEDEFINITION, DATA_CONSISTENCY_TEST, on_dump_listener
 
 
 class TestMain(TestCase):
@@ -12,3 +12,21 @@ class TestMain(TestCase):
         with patch.object(module, "__name__", "__main__"):
             module.init()
             mock_messagedriven_service.assert_called_with(SERVICEDEFINITION, "Test", {"thread_per_service": True})
+
+    @patch("gobtest.__main__.start_workflow")
+    def test_on_dump_listener(self, mock_start_workflow):
+        msg = {
+            'type': 'dump',
+            'contents': {'collection': 'SOME COLL', 'catalog': 'SOME CAT'},
+            'header': {
+                'catalogue': 'SOME CAT',
+                'collection': 'SOME COLL',
+            }
+        }
+
+        on_dump_listener(msg)
+
+        mock_start_workflow.assert_called_with({'workflow_name': DATA_CONSISTENCY_TEST}, {
+            'catalogue': 'SOME CAT',
+            'collection': 'SOME COLL',
+        })
