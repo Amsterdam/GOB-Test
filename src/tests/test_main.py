@@ -14,7 +14,8 @@ class TestMain(TestCase):
             mock_messagedriven_service.assert_called_with(SERVICEDEFINITION, "Test", {"thread_per_service": True})
 
     @patch("gobtest.__main__.start_workflow")
-    def test_on_dump_listener(self, mock_start_workflow):
+    @patch("gobtest.__main__.can_handle")
+    def test_on_dump_listener(self, mock_can_handle, mock_start_workflow):
         msg = {
             'type': 'dump',
             'contents': {'collection': 'SOME COLL', 'catalog': 'SOME CAT'},
@@ -24,6 +25,12 @@ class TestMain(TestCase):
             }
         }
 
+        mock_can_handle.return_value = False
+        on_dump_listener(msg)
+
+        mock_start_workflow.assert_not_called()
+
+        mock_can_handle.return_value = True
         on_dump_listener(msg)
 
         mock_start_workflow.assert_called_with({'workflow_name': DATA_CONSISTENCY_TEST}, {
