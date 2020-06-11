@@ -1,8 +1,27 @@
 import datetime
 
 from gobcore.logging.logger import logger
+from gobcore.exceptions import GOBException
+from gobconfig.exception import GOBConfigException
 
 from gobtest.data_consistency.data_consistency_test import DataConsistencyTest
+
+
+def can_handle(catalogue: str, collection: str, application: str = None):
+    """
+    Is a data consistency test possible for the given cat-col-app combination
+
+    :param catalogue:
+    :param collection:
+    :param application:
+    :return:
+    """
+    try:
+        # Try to instantiate a Data Consistency Test
+        DataConsistencyTest(catalogue, collection, application)
+        return True
+    except GOBConfigException as e:
+        print(f"Data Consistency Test, cannot handle {catalogue} {collection} {application}: {str(e)}")
 
 
 def data_consistency_test_handler(msg):
@@ -22,8 +41,12 @@ def data_consistency_test_handler(msg):
     id = f"{catalog} {collection} {application or ''}"
     # No return value. Results are captured by logger.
     logger.info(f"Data consistency test {id} started")
-    DataConsistencyTest(catalog, collection, application).run()
-    logger.info(f"Data consistency test {id} ended")
+    try:
+        DataConsistencyTest(catalog, collection, application).run()
+    except (GOBException, GOBConfigException) as e:
+        logger.error(f"Dataset connection failed: {str(e)}")
+    else:
+        logger.info(f"Data consistency test {id} ended")
 
     return {
         'header': {

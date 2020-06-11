@@ -13,7 +13,7 @@ from gobcore.message_broker.notifications import get_notification, listen_to_not
 from gobcore.workflow.start_workflow import start_workflow
 
 from gobtest.e2e.handler import end_to_end_test_handler, end_to_end_check_handler
-from gobtest.data_consistency.handler import data_consistency_test_handler
+from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle
 
 
 def on_dump_listener(msg):
@@ -28,7 +28,8 @@ def on_dump_listener(msg):
         'collection': notification.header.get('collection'),
     }
 
-    start_workflow(workflow, arguments)
+    if can_handle(**arguments):
+        start_workflow(workflow, arguments)
 
 
 SERVICEDEFINITION = {
