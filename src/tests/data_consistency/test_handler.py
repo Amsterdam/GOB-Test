@@ -1,7 +1,7 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 
-from gobtest.data_consistency.handler import data_consistency_test_handler
+from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle, GOBConfigException
 
 
 class TestDataConsistencyTestHandler(TestCase):
@@ -38,3 +38,19 @@ class TestDataConsistencyTestHandler(TestCase):
                 'errors': mock_logger.get_errors.return_value,
             }
         }, res)
+
+        mock_logger.error.reset_mock()
+        mock_test.side_effect = GOBConfigException
+        res = data_consistency_test_handler(msg)
+        mock_logger.error.assert_called()
+        # Assert that a response is returned
+        self.assertEqual(res, {'header': ANY, 'summary': ANY})
+
+    @patch("gobtest.data_consistency.handler.DataConsistencyTest")
+    def test_can_handle(self, mock_data_consistency_test):
+        result = can_handle("cat", "col", "app")
+        self.assertEqual(result, True)
+
+        mock_data_consistency_test.side_effect = GOBConfigException
+        result = can_handle("cat", "col", "app")
+        self.assertIsNone(result)
