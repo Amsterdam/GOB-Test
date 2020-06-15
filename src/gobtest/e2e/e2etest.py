@@ -148,7 +148,7 @@ class E2ETest:
         if received == expected_data:
             self._log_info(f"{step_name}: OK")
         else:
-            self._log_error(f"{step_name}: ERROR")
+            self._log_error(f"{step_name}: ERROR checking {testfile} with {endpoint}")
             self._log_error(f"Expected data: {expected_data}")
             self._log_error(f"Received data: {received}")
 
@@ -267,11 +267,133 @@ class E2ETest:
 
         return workflow
 
+    def _build_relate_multiple_allowed_test_workflow(self):  # noqa: C901
+        """Tests the relate process when multiple_allowed = true is used in gobsources
+
+        Two distinct situations are tested:
+        - There is only 1 source, with multiple_allowed = true
+        - There are multiple sources, with mixed values for multiple_allowed = true
+
+        For these two situations, the following actions are tested:
+        A. The initial relate process
+        B. Addition of a new src object that should be related
+        C. Deletion of a src object that was related
+        D. Re-adding the previously deleted object that should be related
+        E. Addition of a bronwaarde that should be related
+        F. Deletion of a bronwaarde that was related
+        G. Re-adding the previously deleted bronwaarde that should be related
+        H. Adding a dst object that should be related
+        I. Deleting a dst object that was related
+        J. Changing the referenced attribute of a related object
+        K. Re-adding a dst object that should be related
+
+        :return:
+        """
+        src_entity = 'rel_multiple_allowed_src'
+        src_multisource_entity = 'rel_multiple_allowed_multisource_src'
+        dst_entity = 'rel_multiple_allowed_dst'
+
+        src_entity_relations = [
+            'tst_ma1_tst_ma3_manyreference',
+            'tst_ma1_tst_ma3_reference'
+        ]
+        src_multisource_entity_relations = [
+            'tst_ma2_tst_ma3_manyreference',
+            'tst_ma2_tst_ma3_reference'
+        ]
+        workflow = []
+
+        """
+        Tests are defined by the steps list.
+
+        Meaning of the parameters:
+        step no:                this number corresponds with the steps as listed below
+        import src:             if true, the src_entity is imported, from source MAsrcA{step_no}
+        import multisource src: if true, the src_multisource_entity is imported, from sources MAsrcA{step_no}
+                                and MAsrcB{step_no}
+        import dst:             if true, dst_entity is imported, from source MAdst{step_no}
+
+        Relates are triggered for the relations that may be updated and the results are checked for these relations.
+
+        The expect filenames are of the form {relation_name}_{step_no}.
+
+        It follows that for every step the appropriate import definitions and correct expect files should be defined.
+
+        Steps with tested cases (see docblock of this method):
+        1. Case A. Initial relation of two simple src objects. One object with one source with multiple_allowed = true.
+                   The other object has two sources, only one of which with multiple_allowed = true. The result is a
+                   hybrid relation table.
+        2. Case B. Objects are added to both src tables.
+        3. Case C. One of the objects in each table is deleted.
+           Case E. A new bronwaarde is added to the manyref of the other object
+           Case F. A bronwaarde is removed from the manyref of this same object.
+           Case E/F. The bronwaarde in the single ref of this same object is changed.
+        4. Case D. Previously deleted objects are added again (from the previous step)
+           Case G. Previously deleted bronwaarde is added again (from the previous step)
+        5. Case H. A new dst object is added.
+           Case I. A dst object is deleted
+           Case J. An existing referenced attribute is changed in the dst object.
+        6. Case K. The previously deleted dst object is re-added again.
+        """
+        steps = [
+            # (step no, import src?, import multisource_src?, import dst?)
+            (1, True, True, True),
+            (2, True, True, False),
+            (3, True, True, False),
+            (4, True, True, False),
+            (5, False, False, True),
+            (6, False, False, True),
+        ]
+
+        for step_no, import_src, import_multisource_src, import_dst in steps:
+            relates = []
+            check_results = []
+
+            if import_src:
+                workflow.append(self._import_workflow_definition(self.test_catalog, src_entity, f'MAsrcA{step_no}'))
+
+            if import_multisource_src:
+                workflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
+                                                                 f'MAsrcA{step_no}'))
+                workflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
+                                                                 f'MAsrcB{step_no}'))
+
+            if import_dst:
+                workflow.append(self._import_workflow_definition(self.test_catalog, dst_entity, f'MAdst{step_no}'))
+
+            if import_src or import_dst:
+                relates.append(
+                    self._relate_workflow_definition(self.test_catalog, src_entity, 'reference'))
+                relates.append(
+                    self._relate_workflow_definition(self.test_catalog, src_entity, 'manyreference'))
+
+                check_results += src_entity_relations
+
+            if import_multisource_src or import_dst:
+                relates.append(
+                    self._relate_workflow_definition(self.test_catalog, src_multisource_entity, 'reference'))
+                relates.append(
+                    self._relate_workflow_definition(self.test_catalog, src_multisource_entity, 'manyreference'))
+
+                check_results += src_multisource_entity_relations
+
+            workflow += relates
+
+            for check_result in check_results:
+                workflow.append(self._check_workflow_step_definition(
+                    f"/dump/rel/{check_result}/?format=csv&exclude_deleted=true",
+                    f"{check_result}_{step_no}",
+                    f"Relation {check_result}"
+                ))
+
+        return workflow
+
     def _build_e2e_workflow(self):
         return self._build_autoid_test_workflow() + \
                self._build_autoid_states_test_workflow() +\
                self._build_import_test_workflow() +\
-               self._build_relate_test_workflow()
+               self._build_relate_test_workflow() +\
+               self._build_relate_multiple_allowed_test_workflow()
 
     def get_workflow(self):
         """Receives end-to-end start message.
