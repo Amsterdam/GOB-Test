@@ -1,0 +1,5 @@
+"src_ref";"src_id";"src_volgnummer";"dst_ref";"dst_id";"dst_volgnummer";"_expiration_date";"begin_geldigheid";"eind_geldigheid";"_last_event"
+"identificatie1_1";"identificatie1";1;"identificatie2_1";"identificatie2";1;;"2010-01-01 00:00:00";;
+"identificatie1_1";"identificatie1";1;"identificatie1_1";"identificatie1";1;;"2010-01-01 00:00:00";;
+"identificatie1_1";"identificatie1";1;"identificatie3_1";"identificatie3";1;;"2010-01-01 00:00:00";;
+"identificatie1_1";"identificatie1";1;"identificatie4_1";"identificatie4";1;;"2010-01-01 00:00:00";;
