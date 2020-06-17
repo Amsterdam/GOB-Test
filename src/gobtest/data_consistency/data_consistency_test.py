@@ -20,6 +20,10 @@ from gobcore.logging.logger import logger
 ANALYSE_DB = 'GOBAnalyse'
 
 
+class NotImplementedCatalogError(GOBException):
+    pass
+
+
 class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
@@ -47,6 +51,10 @@ class DataConsistencyTest:
     SKIP_VALUE = "### SKIP VALUE ###"
 
     def __init__(self, catalog_name: str, collection_name: str, application: str = None):
+
+        if catalog_name == 'rel':
+            raise NotImplementedCatalogError("Not implemented for the 'rel' catalog")
+
         self.import_definition = get_import_definition(catalog_name, collection_name, application)
         self.source = self.import_definition['source']
         self.catalog_name = catalog_name
