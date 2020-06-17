@@ -4,7 +4,7 @@ from gobcore.logging.logger import logger
 from gobcore.exceptions import GOBException
 from gobconfig.exception import GOBConfigException
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, NotImplementedCatalogError
 
 
 def can_handle(catalogue: str, collection: str, application: str = None):
@@ -20,7 +20,7 @@ def can_handle(catalogue: str, collection: str, application: str = None):
         # Try to instantiate a Data Consistency Test
         DataConsistencyTest(catalogue, collection, application)
         return True
-    except GOBConfigException as e:
+    except (GOBConfigException, NotImplementedCatalogError) as e:
         print(f"Data Consistency Test, cannot handle {catalogue} {collection} {application}: {str(e)}")
 
 
@@ -43,8 +43,10 @@ def data_consistency_test_handler(msg):
     logger.info(f"Data consistency test {id} started")
     try:
         DataConsistencyTest(catalog, collection, application).run()
-    except (GOBException, GOBConfigException) as e:
+    except GOBConfigException as e:
         logger.error(f"Dataset connection failed: {str(e)}")
+    except (NotImplementedCatalogError, GOBException) as e:
+        logger.error(f"Dataset test failed: {str(e)}")
     else:
         logger.info(f"Data consistency test {id} ended")
 

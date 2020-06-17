@@ -1,7 +1,8 @@
 from unittest import TestCase
 from unittest.mock import patch, ANY
 
-from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle, GOBConfigException
+from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle, GOBConfigException, \
+    NotImplementedCatalogError, DataConsistencyTest
 
 
 class TestDataConsistencyTestHandler(TestCase):
@@ -45,6 +46,21 @@ class TestDataConsistencyTestHandler(TestCase):
         mock_logger.error.assert_called()
         # Assert that a response is returned
         self.assertEqual(res, {'header': ANY, 'summary': ANY})
+
+    @patch("gobtest.data_consistency.handler.DataConsistencyTest.run")
+    @patch("gobtest.data_consistency.handler.logger")
+    def test_rel_catalog(self, mock_logger, mock_run):
+        msg = {
+            'header': {
+                'catalogue': 'rel',
+                'collection': 'some coll',
+                'application': 'some app'
+            }
+        }
+        data_consistency_test_handler(msg)
+
+        mock_logger.error.assert_called_with("Dataset test failed: Not implemented for the 'rel' catalog")
+        mock_run.assert_not_called()
 
     @patch("gobtest.data_consistency.handler.DataConsistencyTest")
     def test_can_handle(self, mock_data_consistency_test):

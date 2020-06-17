@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD, NotImplementedCatalogError
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
 
@@ -47,6 +47,9 @@ class TestDataConsistencyTestInit(TestCase):
         self.assertTrue(instance.is_merged)
         self.assertTrue(FIELD.SEQNR in instance.ignore_columns)
 
+    def test_init_rel(self, mock_model, mock_get_import_definition):
+        with self.assertRaises(NotImplementedCatalogError):
+            DataConsistencyTest('rel', 'some coll', 'some app')
 
     def test_init_skip_secure_attributes(self, mock_model, mock_get_import_definition):
         mock_get_import_definition.return_value = {
