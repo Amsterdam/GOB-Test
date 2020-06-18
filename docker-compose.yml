@@ -8,7 +8,11 @@ services:
     environment:
       MESSAGE_BROKER_ADDRESS: rabbitmq
       API_HOST: http://gobapi:8001
-
+      ANALYSE_DATABASE_USER: gob
+      ANALYSE_DATABASE_PASSWORD: insecure
+      ANALYSE_DATABASE_HOST_OVERRIDE: analyse_database
+      ANALYSE_DATABASE_PORT_OVERRIDE: 5432
+      ANALYSE_DATABASE: gob_analyse
 networks:
   default:
     external:

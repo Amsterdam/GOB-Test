@@ -297,7 +297,7 @@ class DataConsistencyTest:
         # Take the separator with the highest count
         separator = max(counts.items(), key=operator.itemgetter(1))[0]
         # Return a list from the string splitted on the separator and each value trimmed
-        return [v.strip() for v in s.split(separator)]
+        return [v.strip() for v in s.split(separator) if v]
 
     def _unpack_reference(self, gob_type, attr_name, mapping, source_row, result):
         """
