@@ -1,6 +1,7 @@
 import random
 import re
 import operator
+import datetime
 from functools import reduce
 
 from gobcore.utils import ProgressTicker
@@ -75,7 +76,40 @@ class DataConsistencyTest:
         if self.is_merged:
             self.ignore_columns.append(FIELD.SEQNR)
 
-        # Ignore secure columns to prevent leakage of private data
+        # Ignore secure columns
+        self.ignore_secure_columns()
+
+        # Ignore columns that have modified values
+        self.ignore_filtered_columns()
+
+    def ignore_filtered_columns(self):
+        """
+        Ignore any fields that have a filter definition
+
+        A filter definition is a non-empty array of filters that are applied to any field value
+
+        Filtered fields have values do not correspond 1-1 to a source value
+        and are therefor skipped in the comparison
+        :return:
+        """
+        for attribute, type_info in self.collection['attributes'].items():
+            mapping = self.import_definition['gob_mapping'].get(attribute)
+            if mapping and mapping.get('filters'):
+                # Ignore columns whose values are modified (eg to uppercase, ...)
+                self.ignore_columns.append(attribute)
+                if isinstance(mapping['filters'], dict):
+                    for key in mapping['filters'].keys():
+                        if mapping['filters'][key]:
+                            self.ignore_columns.append(f"{attribute}_{key}")
+
+    def ignore_secure_columns(self):
+        """
+        Ignore any secure fields
+
+        Ignore secure columns to prevent leakage of private data
+
+        :return:
+        """
         for attribute, type_info in self.collection['attributes'].items():
             gob_type = get_gob_type_from_info(type_info)
             if issubclass(gob_type, Secure) or (issubclass(gob_type, Reference) and 'secure' in type_info):
@@ -421,9 +455,12 @@ WHERE
             return src_value == gob_value
         else:
             # Compare the two values as string without whitespace, case-insensitive
-            gob_value = re.sub(r"\s+", "", str(gob_value)).lower()
-            src_value = re.sub(r"\s+", "", str(src_value)).lower()
-            return gob_value == src_value
+            gob_str_value = re.sub(r"\s+", "", str(gob_value)).lower()
+            src_str_value = re.sub(r"\s+", "", str(src_value)).lower()
+            if isinstance(gob_value, datetime.date):
+                # Remove any trailing zero-time to allow date to datetime comparison
+                src_str_value = re.sub(r"00:00:00$", "", src_str_value)
+            return gob_str_value == src_str_value
 
     def _register_compared_columns(self, columns):
         if not self.compared_columns:
