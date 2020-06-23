@@ -452,8 +452,11 @@ class TestDataConsistencyTest(TestCase):
         # Date comparison should skip any 00:00:00 time
         self.assertTrue(inst.equal_values("2020-06-20", datetime.date(2020,6,20)))
         self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.date(2020,6,20)))
+        # But only for dates
+        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.datetime(2020,6,20,0,0,0)))
         # But not any other time
         self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.date(2020,6,20)))
+        self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.datetime(2020,6,20,0,0,2)))
 
     def test_transform_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
