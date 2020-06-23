@@ -26,6 +26,7 @@ def on_dump_listener(msg):
     arguments = {
         'catalogue': notification.header.get('catalogue'),
         'collection': notification.header.get('collection'),
+        'application': notification.header.get('application'),
     }
 
     if can_handle(**arguments):
