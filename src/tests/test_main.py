@@ -22,6 +22,7 @@ class TestMain(TestCase):
             'header': {
                 'catalogue': 'SOME CAT',
                 'collection': 'SOME COLL',
+                'application': 'SOME APP',
             }
         }
 
@@ -36,4 +37,5 @@ class TestMain(TestCase):
         mock_start_workflow.assert_called_with({'workflow_name': DATA_CONSISTENCY_TEST}, {
             'catalogue': 'SOME CAT',
             'collection': 'SOME COLL',
+            'application': 'SOME APP',
         })
