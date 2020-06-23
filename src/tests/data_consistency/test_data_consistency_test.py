@@ -1,6 +1,8 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
+import datetime
+
 from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD, NotImplementedCatalogError
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
@@ -55,7 +57,8 @@ class TestDataConsistencyTestInit(TestCase):
         mock_get_import_definition.return_value = {
             'source': {
                 'entity_id': 'THE ENTITY ID',
-            }
+            },
+            'gob_mapping': {}
         }
 
         mock_attributes = {
@@ -76,6 +79,45 @@ class TestDataConsistencyTestInit(TestCase):
         mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_bronwaarde'])
+
+    def test_init_skip_filtered_attributes(self, mock_model, mock_get_import_definition):
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+            },
+            'gob_mapping': {
+                'a': {
+                    'filters': ['filter1', 'filter2']
+                },
+                'b': {
+                    'filters': {
+                        'sub': ['filter3'],
+                        'sub 1': []
+                    }
+                },
+                'c': {
+                    'filters': []
+                }
+            }
+        }
+
+        mock_attributes = {
+            'a': {
+                'type': 'GOB.String'
+            },
+            'b': {
+                'type': 'GOB.String'
+            },
+            'c': {
+                'type': 'GOB.String'
+            },
+            'd': {
+                'type': 'GOB.String'
+            }
+        }
+        mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
+        instance = DataConsistencyTest('the cat', 'the col', 'the appl')
+        self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_sub'])
 
 mock_get_import_definition = MagicMock()
 
@@ -407,6 +449,11 @@ class TestDataConsistencyTest(TestCase):
         self.assertFalse(inst.equal_values("aap noot mies", "aap noot"))
         self.assertFalse(inst.equal_values("aap noot", "aap noot mies"))
         self.assertTrue(inst.equal_values("  Aap \t nOOt \n", "aap noot"))
+        # Date comparison should skip any 00:00:00 time
+        self.assertTrue(inst.equal_values("2020-06-20", datetime.date(2020,6,20)))
+        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.date(2020,6,20)))
+        # But not any other time
+        self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.date(2020,6,20)))
 
     def test_transform_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
