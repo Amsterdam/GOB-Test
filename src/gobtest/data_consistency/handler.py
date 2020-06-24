@@ -21,7 +21,8 @@ def can_handle(catalogue: str, collection: str, application: str = None):
         DataConsistencyTest(catalogue, collection, application)
         return True
     except (GOBConfigException, NotImplementedCatalogError) as e:
-        print(f"Data Consistency Test, cannot handle {catalogue} {collection} {application}: {str(e)}")
+        print(f"Data Consistency Test notification handler. Not triggering a data consistency test for {catalogue} "
+              f"{collection} {application}, because not able to handle: {str(e)}")
 
 
 def data_consistency_test_handler(msg):
