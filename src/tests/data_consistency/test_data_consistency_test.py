@@ -119,6 +119,51 @@ class TestDataConsistencyTestInit(TestCase):
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_sub'])
 
+    def test_init_skip_enriched_attributes(self, mock_model, mock_get_import_definition):
+        mock_get_import_definition.return_value = {
+            'source': {
+                'entity_id': 'THE ENTITY ID',
+            },
+            'gob_mapping': {
+                'a': {
+                    'enriched': True
+                },
+                'b': {
+                    'enriched': True
+                },
+                'c': {
+                    'enriched': False
+                },
+                'd': {}
+            }
+        }
+
+        mock_attributes = {
+            'a': {
+                'type': 'GOB.String'
+            },
+            'b': {
+                'type': 'GOB.JSON',
+                'attributes': {
+                    'sub1': {
+                        'type': 'GOB.String'
+                    },
+                    'sub2': {
+                        'type': 'GOB.String'
+                    }
+                }
+            },
+            'c': {
+                'type': 'GOB.String'
+            },
+            'd': {
+                'type': 'GOB.String'
+            }
+        }
+        mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
+        instance = DataConsistencyTest('the cat', 'the col', 'the appl')
+        self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b_sub1', 'b_sub2'])
+
 mock_get_import_definition = MagicMock()
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition", mock_get_import_definition)

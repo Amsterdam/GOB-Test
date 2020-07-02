@@ -82,6 +82,9 @@ class DataConsistencyTest:
         # Ignore columns that have modified values
         self.ignore_filtered_columns()
 
+        # Ignore columns that have enriched values in GOB-Import
+        self.ignore_enriched_columns()
+
     def ignore_filtered_columns(self):
         """
         Ignore any fields that have a filter definition
@@ -117,6 +120,23 @@ class DataConsistencyTest:
                 self.ignore_columns.append(attribute)
                 if issubclass(gob_type, Reference):
                     self.ignore_columns.append(f"{attribute}_bronwaarde")
+
+    def ignore_enriched_columns(self):
+        """
+        Ignore any enriched fields
+
+        :return:
+        """
+        for attribute, type_info in self.collection['attributes'].items():
+            mapping = self.import_definition['gob_mapping'].get(attribute)
+            if mapping and mapping.get('enriched'):
+                # Ignore columns whose values are enriched (eg to split to JSON Arrays, ...)
+                if type_info.get('attributes'):
+                    # For JSON fields with attributes defined ignore the specific attributes
+                    for key in type_info.get('attributes').keys():
+                        self.ignore_columns.append(f"{attribute}_{key}")
+                else:
+                    self.ignore_columns.append(attribute)
 
     def run(self):
         self._connect()
