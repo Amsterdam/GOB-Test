@@ -30,6 +30,7 @@ def on_dump_listener(msg):
     }
 
     if can_handle(**arguments):
+        arguments['process_id'] = notification.header.get('process_id')
         start_workflow(workflow, arguments)
 
 
