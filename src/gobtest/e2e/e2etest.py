@@ -465,7 +465,7 @@ class E2ETest:
             subworkflow += relates
 
             workflow.append(self._execute_start_workflow_definition(subworkflow, process_id))
-            workflow.append(self._wait_step_workflow_definition(process_id))
+            workflow.append(self._wait_step_workflow_definition(process_id, 60))
 
             for check_result in check_results:
                 workflow.append(self._check_workflow_step_definition(
