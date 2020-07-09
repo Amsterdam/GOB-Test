@@ -23,6 +23,7 @@ class TestMain(TestCase):
                 'catalogue': 'SOME CAT',
                 'collection': 'SOME COLL',
                 'application': 'SOME APP',
+                'process_id': 'PROCESS ID'
             }
         }
 
@@ -34,8 +35,15 @@ class TestMain(TestCase):
         mock_can_handle.return_value = True
         on_dump_listener(msg)
 
+        mock_can_handle.assert_called_with(**{
+            'catalogue': 'SOME CAT',
+            'collection': 'SOME COLL',
+            'application': 'SOME APP',
+        })
+
         mock_start_workflow.assert_called_with({'workflow_name': DATA_CONSISTENCY_TEST}, {
             'catalogue': 'SOME CAT',
             'collection': 'SOME COLL',
             'application': 'SOME APP',
+            'process_id': 'PROCESS ID',
         })

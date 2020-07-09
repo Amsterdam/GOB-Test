@@ -8,10 +8,11 @@ Program exit code is the number of errors that occurred, or -1 in case a system 
 
 import os
 import requests
-
+import time
 
 from gobcore.logging.logger import logger
-from gobcore.message_broker.config import IMPORT, END_TO_END_CHECK, RELATE
+from gobcore.message_broker.config import IMPORT, END_TO_END_CHECK, RELATE, END_TO_END_EXECUTE, END_TO_END_WAIT
+from gobcore.workflow.start_workflow import start_workflow
 from gobtest.config import API_HOST
 
 
@@ -93,6 +94,9 @@ class E2ETest:
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
     check_autoid_endpoint = "/test_catalogue/test_entity_autoid/?ndjson=true"
     check_autoid_states_endpoint = "/test_catalogue/test_entity_autoid_states/?ndjson=true"
+
+    def __init__(self, process_id: str):
+        self.process_id = process_id
 
     def _remove_last_event(self, api_response: str):
         """
@@ -176,7 +180,26 @@ class E2ETest:
             }
         }
 
+    def _wait_step_workflow_definition(self, wait_for_process_id: str, seconds: int = 30):
+        return {
+            'type': 'workflow_step',
+            'step_name': END_TO_END_WAIT,
+            'header': {
+                'wait_for_process_id': wait_for_process_id,
+                'seconds': seconds,
+            }
+        }
+
     def _check_workflow_step_definition(self, endpoint: str, expect: str, description: str):
+        """Compares the output from an API endpoint with a file with the expected output.
+        Waits for the process with :check_process_id: to finish.
+
+        :param endpoint: The endpoint response to check
+        :param expect: The file containing the expected response
+        :param description: Some descriptive string
+        :param check_process_id: The ID of the process to wait for before checking the endpoint.
+        :return:
+        """
         return {
             'type': 'workflow_step',
             'step_name': END_TO_END_CHECK,
@@ -184,6 +207,25 @@ class E2ETest:
                 'endpoint': endpoint,
                 'expect': expect,
                 'description': description,
+            }
+        }
+
+    def _execute_start_workflow_definition(self, workflow: list, process_id: str):
+        """Start a workflow as a separate job. Assign given :process_id: .
+        Allows us to wait for the complete process including event-triggered jobs to finish before checking the
+        results.
+
+        :param workflow: The dynamic workflow to execute
+        :param process_id: The process id to assign to the new workflow (with which we can keep track of it)
+        :return:
+        """
+
+        return {
+            'type': 'workflow_step',
+            'step_name': END_TO_END_EXECUTE,
+            'header': {
+                'execute': workflow,
+                'execute_process_id': process_id
             }
         }
 
@@ -202,10 +244,20 @@ class E2ETest:
         workflow = []
 
         # Import test_entity_autoid's to test autoid issuing
-        for source in self.test_import_autoid_sources:
-            workflow.append(self._import_workflow_definition(self.test_catalog,
-                                                             self.test_import_entity_autoid,
-                                                             source))
+        for i, source in enumerate(self.test_import_autoid_sources):
+            process_id = f"{self.process_id}.autoid.{i}"
+            workflow.append(
+                self._execute_start_workflow_definition(
+                    [
+                        self._import_workflow_definition(self.test_catalog,
+                                                         self.test_import_entity_autoid,
+                                                         source)
+                    ],
+                    process_id
+                )
+            )
+
+            workflow.append(self._wait_step_workflow_definition(process_id))
             workflow.append(self._check_workflow_step_definition(self.check_autoid_endpoint,
                                                                  source,
                                                                  f"Import {source}"))
@@ -215,10 +267,19 @@ class E2ETest:
         workflow = []
 
         # Import test_entity_autoid's to test autoid issuing
-        for source in self.test_import_autoid_states_sources:
-            workflow.append(self._import_workflow_definition(self.test_catalog,
-                                                             self.test_import_entity_autoid_states,
-                                                             source))
+        for i, source in enumerate(self.test_import_autoid_states_sources):
+            process_id = f"{self.process_id}.autoid_states.{i}"
+
+            workflow.append(
+                self._execute_start_workflow_definition(
+                    [self._import_workflow_definition(self.test_catalog,
+                                                      self.test_import_entity_autoid_states,
+                                                      source)],
+                    process_id
+                )
+            )
+
+            workflow.append(self._wait_step_workflow_definition(process_id))
             workflow.append(self._check_workflow_step_definition(self.check_autoid_states_endpoint,
                                                                  source,
                                                                  f"Import {source}"))
@@ -227,15 +288,25 @@ class E2ETest:
     def _build_import_test_workflow(self):
         workflow = []
 
+        sub_workflow = []
         # Import test_entity_ref's to prevent dangling relations
         for source in self.test_import_ref_sources:
-            workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity_ref, source))
+            sub_workflow.append(
+                self._import_workflow_definition(self.test_catalog, self.test_import_entity_ref, source)
+            )
 
         # Import test_entity's
-        for source in self.test_import_sources:
-            workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity, source))
-            workflow.append(self._relate_workflow_definition(self.test_catalog, self.test_import_entity,
-                                                             self.test_import_entity_reference))
+        for i, source in enumerate(self.test_import_sources):
+            subworkflow_process_id = f"{self.process_id}.import_test.{source}.{i}"
+
+            sub_workflow.append(self._import_workflow_definition(self.test_catalog, self.test_import_entity, source))
+            sub_workflow.append(self._relate_workflow_definition(self.test_catalog, self.test_import_entity,
+                                                                 self.test_import_entity_reference))
+
+            workflow.append(self._execute_start_workflow_definition(sub_workflow, subworkflow_process_id))
+            sub_workflow = []
+
+            workflow.append(self._wait_step_workflow_definition(subworkflow_process_id))
             workflow.append(self._check_workflow_step_definition(self.check_import_endpoint, source,
                                                                  f"Import {source}"))
         return workflow
@@ -249,16 +320,27 @@ class E2ETest:
 
         for src_entity in self.test_relation_src_entities:
             for dst_rel in self.test_relation_dst_relations:
+                process_id = f"{self.process_id}.relate.{src_entity}.{dst_rel}"
+
                 # Relate job
-                workflow.append(self._relate_workflow_definition(
-                    self.test_catalog,
-                    src_entity,
-                    # Extract relation name from dst_rel (rtc_ref_to_c > ref_to_c)
-                    '_'.join(dst_rel.split('_')[1:])
-                ))
+                workflow.append(
+                    self._execute_start_workflow_definition(
+                        [
+                            self._relate_workflow_definition(
+                                self.test_catalog,
+                                src_entity,
+                                # Extract relation name from dst_rel (rtc_ref_to_c > ref_to_c)
+                                '_'.join(dst_rel.split('_')[1:])
+
+                            )
+                        ],
+                        process_id
+                    )
+                )
 
                 rel_entity = f"tst_{self.entities_abbreviations[src_entity]}_tst_{dst_rel}"
                 # Check relation
+                workflow.append(self._wait_step_workflow_definition(process_id))
                 workflow.append(self._check_workflow_step_definition(
                     f"/dump/rel/{rel_entity}/?format=csv",
                     rel_entity,
@@ -348,18 +430,21 @@ class E2ETest:
         for step_no, import_src, import_multisource_src, import_dst in steps:
             relates = []
             check_results = []
+            subworkflow = []
+
+            process_id = f"{self.process_id}.relate_multiple_allowed.step{step_no}"
 
             if import_src:
-                workflow.append(self._import_workflow_definition(self.test_catalog, src_entity, f'MAsrcA{step_no}'))
+                subworkflow.append(self._import_workflow_definition(self.test_catalog, src_entity, f'MAsrcA{step_no}'))
 
             if import_multisource_src:
-                workflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
-                                                                 f'MAsrcA{step_no}'))
-                workflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
-                                                                 f'MAsrcB{step_no}'))
+                subworkflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
+                                                                    f'MAsrcA{step_no}'))
+                subworkflow.append(self._import_workflow_definition(self.test_catalog, src_multisource_entity,
+                                                                    f'MAsrcB{step_no}'))
 
             if import_dst:
-                workflow.append(self._import_workflow_definition(self.test_catalog, dst_entity, f'MAdst{step_no}'))
+                subworkflow.append(self._import_workflow_definition(self.test_catalog, dst_entity, f'MAdst{step_no}'))
 
             if import_src or import_dst:
                 relates.append(
@@ -377,13 +462,16 @@ class E2ETest:
 
                 check_results += src_multisource_entity_relations
 
-            workflow += relates
+            subworkflow += relates
+
+            workflow.append(self._execute_start_workflow_definition(subworkflow, process_id))
+            workflow.append(self._wait_step_workflow_definition(process_id, 60))
 
             for check_result in check_results:
                 workflow.append(self._check_workflow_step_definition(
                     f"/dump/rel/{check_result}/?format=csv&exclude_deleted=true",
                     f"{check_result}_{step_no}",
-                    f"Relation {check_result}"
+                    f"Relation {check_result}",
                 ))
 
         return workflow
@@ -404,5 +492,35 @@ class E2ETest:
 
         return self._build_e2e_workflow()
 
+    def execute_workflow(self, workflow: list, workflow_process_id: str):
+        args = {
+            'header': {
+                'workflow': workflow,
+                'process_id': workflow_process_id,
+            }
+        }
+        workflow = {'workflow_name': 'dynamic'}
+
+        start_workflow(workflow, args)
+
+    def wait(self, process_id: str, seconds: int):
+        """Wait for :process_id: to be finished.
+        To be implemented correctly later when statuses of processes are tracked correctly. At this moment we just wait
+        for :seconds: seconds
+
+        :param process_id:
+        :param seconds:
+        :return:
+        """
+        self._log_info(f"Wait for process {process_id} to complete")
+        time.sleep(seconds)
+
     def check(self, endpoint: str, expect: str, description: str):
+        """
+
+        :param endpoint:
+        :param expect:
+        :param description:
+        :return:
+        """
         self._check_api_output(endpoint, expect, description)
