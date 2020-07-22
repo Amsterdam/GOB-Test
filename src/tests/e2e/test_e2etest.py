@@ -234,6 +234,24 @@ class TestE2Test(TestCase):
             'B_tst_rel_dst_b,Relation tst_src B_tst_rel_dst_b'
         ], e2e._build_relate_test_workflow())
 
+    def test_build_relate_collapsed_states_test_workflow(self):
+        e2e = E2ETest('process_id')
+        e2e._import_workflow_definition = lambda *args: "import " + ",".join(args)
+        e2e._check_workflow_step_definition = lambda *args: "check " + ",".join(args)
+        e2e._relate_workflow_definition = lambda *args: "relate " + ",".join(args)
+        e2e._execute_start_workflow_definition = lambda wf, process_id: 'execute ' + process_id
+        e2e._wait_step_workflow_definition = lambda process_id, seconds=10: f"wait {seconds} for {process_id}"
+
+        self.assertEqual([
+            'import test_catalogue,rel_collapsed_a,REL',
+            'import test_catalogue,rel_collapsed_b,REL',
+            'execute process_id.relate.collapsed_states',
+            'wait 10 for process_id.relate.collapsed_states',
+            'check '
+            '/dump/rel/tst_cola_tst_colb_reference/?format=csv,tst_cola_tst_colb_reference,Relation '
+            'tst_cola_tst_colb_reference'
+        ], e2e._build_relate_collapsed_states_test_workflow())
+
     def test_build_relate_multiple_allowed_test_workflow(self):
         e2e = E2ETest('process_id')
         e2e.test_catalog = 'test cat'
@@ -253,7 +271,8 @@ class TestE2Test(TestCase):
         e2e._build_import_test_workflow = MagicMock(return_value=['a', 'b'])
         e2e._build_relate_test_workflow = MagicMock(return_value=['c', 'd'])
         e2e._build_relate_multiple_allowed_test_workflow = MagicMock(return_value=['e', 'f'])
-        self.assertEqual(['0', '1', '2', '3', 'a', 'b', 'c', 'd', 'e', 'f'], e2e._build_e2e_workflow())
+        e2e._build_relate_collapsed_states_test_workflow = MagicMock(return_value=['g', 'h'])
+        self.assertEqual(['0', '1', '2', '3', 'a', 'b', 'c', 'd', 'g', 'h', 'e', 'f'], e2e._build_e2e_workflow())
 
     def test_get_workflow(self):
         e2e = E2ETest('process_id')
