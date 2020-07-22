@@ -349,6 +349,39 @@ class E2ETest:
 
         return workflow
 
+    def _build_relate_collapsed_states_test_workflow(self):
+        """Builds relate collapsed states test. Collapsed states are states where begin_geldigheid = eind_geldigheid
+
+        :return:
+        """
+        workflow = []
+
+        src_entity = 'rel_collapsed_a'
+        dst_entity = 'rel_collapsed_b'
+        relation_attribute = 'reference'
+        process_id = f"{self.process_id}.relate.collapsed_states"
+        relation_name = "tst_cola_tst_colb_reference"
+
+        workflow.append(self._import_workflow_definition(self.test_catalog, src_entity, 'REL'))
+        workflow.append(self._import_workflow_definition(self.test_catalog, dst_entity, 'REL'))
+
+        workflow.append(self._execute_start_workflow_definition([
+            self._relate_workflow_definition(
+                self.test_catalog,
+                src_entity,
+                relation_attribute,
+            )
+        ], process_id))
+
+        workflow.append(self._wait_step_workflow_definition(process_id))
+        workflow.append(self._check_workflow_step_definition(
+            f"/dump/rel/{relation_name}/?format=csv",
+            relation_name,
+            f"Relation {relation_name}"
+        ))
+
+        return workflow
+
     def _build_relate_multiple_allowed_test_workflow(self):  # noqa: C901
         """Tests the relate process when multiple_allowed = true is used in gobsources
 
@@ -481,6 +514,7 @@ class E2ETest:
                self._build_autoid_states_test_workflow() +\
                self._build_import_test_workflow() +\
                self._build_relate_test_workflow() +\
+               self._build_relate_collapsed_states_test_workflow() +\
                self._build_relate_multiple_allowed_test_workflow()
 
     def get_workflow(self):
