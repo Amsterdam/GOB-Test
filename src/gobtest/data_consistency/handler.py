@@ -56,8 +56,5 @@ def data_consistency_test_handler(msg):
             **msg.get('header', {}),
             'timestamp': datetime.datetime.utcnow().isoformat(),
         },
-        'summary': {
-            'warnings': logger.get_warnings(),
-            'errors': logger.get_errors(),
-        }
+        'summary': logger.get_summary(),
     }

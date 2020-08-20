@@ -42,10 +42,7 @@ class TestHandler(TestCase):
                 'execute_process_id': 'process id to assign',
                 'process_id': 'this process id',
             },
-            'summary': {
-                'warnings': mock_logger.get_warnings.return_value,
-                'errors': mock_logger.get_errors.return_value,
-            },
+            'summary': mock_logger.get_summary(),
         }, end_to_end_execute_workflow_handler(msg))
 
         mock_e2etest().execute_workflow.assert_called_with(['some', 'workflow'], 'process id to assign')
@@ -66,10 +63,7 @@ class TestHandler(TestCase):
                 'wait_for_process_id': 'process to wait for',
                 'seconds': 14904
             },
-            'summary': {
-                'warnings': mock_logger.get_warnings.return_value,
-                'errors': mock_logger.get_errors.return_value,
-            }
+            'summary': mock_logger.get_summary(),
         }, end_to_end_wait_handler(msg))
 
         mock_e2etest().wait.assert_called_with('process to wait for', 14904)
@@ -84,10 +78,7 @@ class TestHandler(TestCase):
                 'description': 'desc',
                 'process_id': 'the process id',
             },
-            'summary': {
-                'warnings': mock_logger.get_warnings.return_value,
-                'errors': mock_logger.get_errors.return_value,
-            }
+            'summary': mock_logger.get_summary(),
         }, end_to_end_check_handler({
             'header': {
                 'attribute': 'value',
