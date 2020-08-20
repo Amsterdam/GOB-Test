@@ -34,10 +34,7 @@ class TestDataConsistencyTestHandler(TestCase):
                 'application': 'the application',
                 'timestamp': mock_datetime.datetime.utcnow.return_value.isoformat.return_value,
             },
-            'summary': {
-                'warnings': mock_logger.get_warnings.return_value,
-                'errors': mock_logger.get_errors.return_value,
-            }
+            'summary': mock_logger.get_summary(),
         }, res)
 
         mock_logger.error.reset_mock()

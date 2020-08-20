@@ -52,10 +52,7 @@ def end_to_end_execute_workflow_handler(msg):
         'header': {
             **msg.get('header', {}),
         },
-        'summary': {
-            'warnings': logger.get_warnings(),
-            'errors': logger.get_errors(),
-        }
+        'summary': logger.get_summary(),
     }
 
 
@@ -74,10 +71,7 @@ def end_to_end_wait_handler(msg):
         'header': {
             **msg.get('header', {}),
         },
-        'summary': {
-            'warnings': logger.get_warnings(),
-            'errors': logger.get_errors(),
-        }
+        'summary': logger.get_summary(),
     }
 
 
@@ -97,8 +91,5 @@ def end_to_end_check_handler(msg):
         'header': {
             **msg.get('header', {}),
         },
-        'summary': {
-            'warnings': logger.get_warnings(),
-            'errors': logger.get_errors(),
-        }
+        'summary': logger.get_summary(),
     }
