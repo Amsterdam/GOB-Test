@@ -180,7 +180,7 @@ class E2ETest:
             }
         }
 
-    def _wait_step_workflow_definition(self, wait_for_process_id: str, seconds: int = 30):
+    def _wait_step_workflow_definition(self, wait_for_process_id: str, seconds: int = 60):
         return {
             'type': 'workflow_step',
             'step_name': END_TO_END_WAIT,
