@@ -12,8 +12,10 @@ import time
 
 from gobcore.logging.logger import logger
 from gobcore.message_broker.config import IMPORT, END_TO_END_CHECK, RELATE, END_TO_END_EXECUTE, END_TO_END_WAIT
+from gobcore.message_broker.notifications import NOTIFY_EXCHANGE
+from gobcore.message_broker.config import WORKFLOW_QUEUE
 from gobcore.workflow.start_workflow import start_workflow
-from gobtest.config import API_HOST
+from gobtest.config import API_HOST, MANAGEMENT_API_BASE
 
 
 class E2ETest:
@@ -23,6 +25,9 @@ class E2ETest:
     result.
 
     """
+    MAX_SECONDS_TO_WAIT_FOR_PROCESS_TO_FINISH = 600     # Wait for maximally 10 minutes
+    CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH = 5     # Check every 5 seconds
+
     test_catalog = "test_catalogue"
 
     test_import_entity = "test_entity"
@@ -159,6 +164,9 @@ class E2ETest:
     def _log_error(self, message):
         logger.error(message)
 
+    def _log_warning(self, message):
+        logger.warning(message)
+
     def _log_info(self, message):
         logger.info(message)
 
@@ -180,7 +188,8 @@ class E2ETest:
             }
         }
 
-    def _wait_step_workflow_definition(self, wait_for_process_id: str, seconds: int = 60):
+    def _wait_step_workflow_definition(self, wait_for_process_id: str,
+                                       seconds: int = MAX_SECONDS_TO_WAIT_FOR_PROCESS_TO_FINISH):
         return {
             'type': 'workflow_step',
             'step_name': END_TO_END_WAIT,
@@ -498,7 +507,8 @@ class E2ETest:
             subworkflow += relates
 
             workflow.append(self._execute_start_workflow_definition(subworkflow, process_id))
-            workflow.append(self._wait_step_workflow_definition(process_id, 60))
+            workflow.append(self._wait_step_workflow_definition(process_id,
+                                                                self.MAX_SECONDS_TO_WAIT_FOR_PROCESS_TO_FINISH))
 
             for check_result in check_results:
                 workflow.append(self._check_workflow_step_definition(
@@ -537,17 +547,123 @@ class E2ETest:
 
         start_workflow(workflow, args)
 
-    def wait(self, process_id: str, seconds: int):
-        """Wait for :process_id: to be finished.
-        To be implemented correctly later when statuses of processes are tracked correctly. At this moment we just wait
-        for :seconds: seconds
+    def pending_messages(self, queue_names):
+        """
+        Reports the number of pending messages for queues whose name starts with any of the given queue names
 
-        :param process_id:
-        :param seconds:
+        :param queue_names: List of queue names
         :return:
         """
-        self._log_info(f"Wait for process {process_id} to complete")
-        time.sleep(seconds)
+        url = f"{MANAGEMENT_API_BASE}/queues"
+        response = requests.get(url)
+        assert response.ok, f"API request for pending messages has failed"
+        # Example response
+        # [{...}, {...}]
+        all_queues = response.json()
+
+        # Get all queues with unhandled messages, pending to be processed
+        messages_unacknowledged = "messages_unacknowledged"
+        pending_queues = [queue for queue in all_queues
+                          if queue[messages_unacknowledged] > 0]
+
+        # Count pending messages
+        n_pending = 0
+        for name in queue_names:
+            n_pending += sum([queue[messages_unacknowledged] for queue in pending_queues
+                              if queue["name"].startswith(name)])
+        return n_pending
+
+    def pending_jobs(self, process_id):
+        """
+        Reports the number of jobs that run for the given process
+
+        If no jobs are found -1 is returned to indicate that the process has not yet started or does not exist
+
+        :param process_id:
+        :return:
+        """
+        url = f"{MANAGEMENT_API_BASE}/graphql"
+        query = '{ processjobs(processId:"%s") { jobid processId status } }' % process_id
+        response = requests.post(url, json={'query': query})
+        assert response.ok, f"API request for pending jobs has failed"
+        process_jobs = response.json()
+        # Example response
+        # {
+        #   'data': {
+        #     'processjobs': [{'jobid': 226, 'processId': '1600173174.e2e_test..autoid.0', 'status': 'scheduled'}]
+        #   }
+        # }
+        jobs = process_jobs['data']['processjobs']
+        if not jobs:
+            # Process has not yet started or does not exist
+            return -1
+        # Process has started, return number of jobs that do not yet have finished
+        unfinished_jobs = [job for job in jobs if job['status'] != 'ended']
+        return len(unfinished_jobs)
+
+    def wait(self, process_id: str, max_seconds_to_try: int):
+        """Wait for :process_id: to be finished.
+
+        The check is quite straightforward
+        First the jobs for the given process id are requested
+        If there are any jobs the process is considered to have started
+        If all jobs have ended the process is considered to have ended
+
+        An extra check is made to check the length of the notification queues and start workflow queue
+        If any messages are present in any of these queues the process will require more confirmations
+        that all jobs have ended
+
+        The given number of seconds is the max time that the wait process will check for jobs
+
+        :param process_id: the process id of the process to wait for
+        :param max_seconds_to_try: the max time to check for running jobs within the process
+        :return:
+        """
+        self._log_info(f"Wait for process {process_id} to complete for max {max_seconds_to_try} seconds")
+
+        confirmed = 0                           # Number of times the process has been confirmed to have finished
+        last_pending_jobs = 0                   # Last number of pending jobs that has been registered
+        seconds_to_try = max_seconds_to_try     # Max nr seconds to wait for process to have finished
+        while seconds_to_try > 0:
+            # Try for a maximum of seconds_to_try seconds
+
+            # count pending jobs for the given process
+            pending_jobs = self.pending_jobs(process_id)
+
+            if pending_jobs > last_pending_jobs:
+                # Process is still expanding
+                seconds_to_try = max_seconds_to_try
+            last_pending_jobs = pending_jobs
+
+            if pending_jobs == 0:
+                # No pending jobs
+                if confirmed >= 1:
+                    # If sufficiently confirmed then consider process as finished
+                    self._log_info(f"Process {process_id} has completed")
+                    return True
+
+                # count pending notifications or workflow starts
+                pending_messages = self.pending_messages([NOTIFY_EXCHANGE, WORKFLOW_QUEUE])
+
+                if pending_messages == 0:
+                    # No pending jobs and no pending messages
+                    # Confirmation is required because of a possible race condition
+                    # - Workflow has accepted the message but not yet committed the job
+                    confirmed += 1
+                else:
+                    # No pending jobs but there are pending messages
+                    # Require extra confirmations
+                    confirmed += 0.5
+            else:
+                confirmed = 0   # process still running; reset any confirmations
+
+            # Wait some time before re-testing the process
+            time.sleep(self.CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH)
+            # But do not test forever
+            seconds_to_try -= self.CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH
+
+        self._log_warning(f"Max wait time for process {process_id} to complete exceeded.")
+        return False
 
     def check(self, endpoint: str, expect: str, description: str):
         """

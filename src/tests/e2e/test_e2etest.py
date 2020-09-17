@@ -2,6 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
 import os
+import math
 from gobtest.e2e.e2etest import E2ETest, IMPORT, RELATE, END_TO_END_CHECK, END_TO_END_EXECUTE, END_TO_END_WAIT
 
 
@@ -300,13 +301,91 @@ class TestE2Test(TestCase):
 
         e2e._check_api_output.assert_called_with('a', 'b', 'c')
 
+    @patch("gobtest.e2e.e2etest.requests.get")
+    def test_pending_messages(self, mock_get):
+        e2e = E2ETest('process_id')
+        mock_get.return_value.ok = True
+
+        mock_get.return_value.json = lambda: [
+            {'name': 'q1', 'messages_unacknowledged': 1},               # match
+            {'name': 'q1.some.thing', 'messages_unacknowledged': 3},    # match
+            {'name': 'q2', 'messages_unacknowledged': 5},               # match
+            {'name': 'some.q2', 'messages_unacknowledged': 7},          # no match
+            {'name': 'q3', 'messages_unacknowledged': 9}                # no match
+        ]
+        pending = e2e.pending_messages(['q1', 'q2'])
+        self.assertEqual(pending, 1 + 3 + 5)
+
+    @patch("gobtest.e2e.e2etest.requests.post")
+    def test_pending_jobs(self, mock_post):
+        e2e = E2ETest('process_id')
+        mock_post.return_value.ok = True
+
+        mock_post.return_value.json = lambda: {
+            'data': {
+                'processjobs': []
+            }
+        }
+        pending = e2e.pending_jobs('p1')
+        self.assertEqual(pending, -1)
+
+        mock_post.return_value.json = lambda: {
+            'data': {
+                'processjobs': [
+                    {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'},
+                    {'jobid': 1, 'processId': 'p1', 'status': 'any status'},
+                    {'jobid': 1, 'processId': 'p1', 'status': 'ended'},
+                    {'jobid': 1, 'processId': 'p1', 'status': 'started'},
+                    {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'}
+                ]
+            }
+        }
+        pending = e2e.pending_jobs('p1')
+        self.assertEqual(pending, 4)
+
     @patch("gobtest.e2e.e2etest.time.sleep")
     def test_wait(self, mock_sleep):
         e2e = E2ETest('process_id')
-        e2e._log_info = MagicMock()
+        mock_pending_messages = MagicMock()
+        mock_pending_jobs = MagicMock()
 
-        e2e.wait('some process id', 248)
-        mock_sleep.assert_called_with(248)
+        e2e.pending_messages = mock_pending_messages
+        e2e.pending_jobs = mock_pending_jobs
+
+        max_seconds_to_try = 99
+
+        # No pending jobs and messages, process has finished
+        mock_pending_jobs.return_value = 0
+        mock_pending_messages.return_value = 0
+        result = e2e.wait('any process id', max_seconds_to_try)
+        self.assertEqual(result, True)
+        self.assertEqual(mock_sleep.call_count, 1)  # 1 confirmation
+
+        # No pending jobs and pending messages, process has finished
+        mock_sleep.reset_mock()
+        mock_pending_jobs.return_value = 0
+        mock_pending_messages.return_value = 1
+        result = e2e.wait('any process id', max_seconds_to_try)
+        self.assertEqual(result, True)
+        self.assertEqual(mock_sleep.call_count, 2)  # 1 extra confirmation for pending messages
+
+        # pending jobs and pending messages, process has not finished
+        mock_sleep.reset_mock()
+        mock_pending_jobs.return_value = 1
+        mock_pending_messages.return_value = 1
+        result = e2e.wait('any process id', max_seconds_to_try)
+        self.assertEqual(result, False)
+        self.assertEqual(mock_sleep.call_count,
+                         math.ceil(max_seconds_to_try/e2e.CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH))
+
+        # pending jobs and no pending messages, process has not finished
+        mock_sleep.reset_mock()
+        mock_pending_jobs.return_value = 1
+        mock_pending_messages.return_value = 0
+        result = e2e.wait('any process id', max_seconds_to_try)
+        self.assertEqual(result, False)
+        self.assertEqual(mock_sleep.call_count,
+                         math.ceil(max_seconds_to_try/e2e.CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH))
 
     @patch("gobtest.e2e.e2etest.requests.delete")
     def test_cleartests(self, mock_delete):
