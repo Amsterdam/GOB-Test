@@ -76,6 +76,13 @@ source venv/bin/activate
 
 # Run
 
+Set environment:
+
+```bash
+export $(cat .env | xargs)  # Copy from .env.example if missing
+```
+
+
 Start the service:
 
 ```bash
