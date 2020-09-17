@@ -25,7 +25,7 @@ class E2ETest:
     result.
 
     """
-    MAX_SECONDS_TO_WAIT_FOR_PROCESS_TO_FINISH = 600     # Wait for maximally 10 minutes
+    MAX_SECONDS_TO_WAIT_FOR_PROCESS_TO_FINISH = 120     # Wait for maximally 2 minutes
     CHECK_EVERY_N_SECONDS_FOR_PROCESS_TO_FINISH = 5     # Check every 5 seconds
 
     test_catalog = "test_catalogue"
