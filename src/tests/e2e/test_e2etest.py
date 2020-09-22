@@ -307,39 +307,31 @@ class TestE2Test(TestCase):
         mock_get.return_value.ok = True
 
         mock_get.return_value.json = lambda: [
-            {'name': 'q1', 'messages_unacknowledged': 1},               # match
-            {'name': 'q1.some.thing', 'messages_unacknowledged': 3},    # match
-            {'name': 'q2', 'messages_unacknowledged': 5},               # match
-            {'name': 'some.q2', 'messages_unacknowledged': 7},          # no match
-            {'name': 'q3', 'messages_unacknowledged': 9}                # no match
+            {'name': 'q1', 'messages_unacknowledged': 1},
+            {'name': 'q1.some.thing', 'messages_unacknowledged': 3},
+            {'name': 'q2', 'messages_unacknowledged': 5},
+            {'name': 'some.q2', 'messages_unacknowledged': 7},
+            {'name': 'q3', 'messages_unacknowledged': 11}
         ]
-        pending = e2e.pending_messages(['q1', 'q2'])
-        self.assertEqual(pending, 1 + 3 + 5)
+        pending = e2e.pending_messages()
+        self.assertEqual(pending, 1 + 3 + 5 + 7 + 11)
 
-    @patch("gobtest.e2e.e2etest.requests.post")
-    def test_pending_jobs(self, mock_post):
+    @patch("gobtest.e2e.e2etest.requests.get")
+    def test_pending_jobs(self, mock_get):
         e2e = E2ETest('process_id')
-        mock_post.return_value.ok = True
+        mock_get.return_value.ok = True
 
-        mock_post.return_value.json = lambda: {
-            'data': {
-                'processjobs': []
-            }
-        }
+        mock_get.return_value.json = lambda: []
         pending = e2e.pending_jobs('p1')
         self.assertEqual(pending, -1)
 
-        mock_post.return_value.json = lambda: {
-            'data': {
-                'processjobs': [
+        mock_get.return_value.json = lambda: [
                     {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'any status'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'ended'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'started'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'}
                 ]
-            }
-        }
         pending = e2e.pending_jobs('p1')
         self.assertEqual(pending, 4)
 
