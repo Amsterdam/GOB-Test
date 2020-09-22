@@ -12,8 +12,6 @@ import time
 
 from gobcore.logging.logger import logger
 from gobcore.message_broker.config import IMPORT, END_TO_END_CHECK, RELATE, END_TO_END_EXECUTE, END_TO_END_WAIT
-from gobcore.message_broker.notifications import NOTIFY_EXCHANGE
-from gobcore.message_broker.config import WORKFLOW_QUEUE
 from gobcore.workflow.start_workflow import start_workflow
 from gobtest.config import API_HOST, MANAGEMENT_API_BASE
 
@@ -547,32 +545,21 @@ class E2ETest:
 
         start_workflow(workflow, args)
 
-    def pending_messages(self, queue_names):
+    def pending_messages(self):
         """
-        Reports the number of pending messages for queues whose name starts with any of the given queue names
+        Reports the number of pending messages for queues that contain notifications or start workflows
 
-        :param queue_names: List of queue names
-        :return:
+        :return: #pending messages
         """
-        url = f"{MANAGEMENT_API_BASE}/queues"
-        print("Get queues", url)
+        url = f"{MANAGEMENT_API_BASE}/state/workflow"
         response = requests.get(url)
-        assert response.ok, f"API request for pending messages has failed"
+        assert response.ok, f"API request for pending workflow messages has failed"
+        workflow_queues = response.json()
         # Example response
-        # [{...}, {...}]
-        all_queues = response.json()
-
-        # Get all queues with unhandled messages, pending to be processed
-        messages_unacknowledged = "messages_unacknowledged"
-        pending_queues = [queue for queue in all_queues
-                          if queue[messages_unacknowledged] > 0]
+        # [{'name': ..., 'messages_unacknowledged': ...}, {...}]
 
         # Count pending messages
-        n_pending = 0
-        for name in queue_names:
-            n_pending += sum([queue[messages_unacknowledged] for queue in pending_queues
-                              if queue["name"].startswith(name)])
-        return n_pending
+        return sum([queue['messages_unacknowledged'] for queue in workflow_queues])
 
     def pending_jobs(self, process_id):
         """
@@ -583,19 +570,12 @@ class E2ETest:
         :param process_id:
         :return:
         """
-        url = f"{MANAGEMENT_API_BASE}/graphql"
-        query = '{ processjobs(processId:"%s") { jobid processId status } }' % process_id
-        print("Get jobs", url, query)
-        response = requests.post(url, json={'query': query})
-        assert response.ok, f"API request for pending jobs has failed"
-        process_jobs = response.json()
+        url = f"{MANAGEMENT_API_BASE}/state/process/{process_id}"
+        response = requests.get(url)
+        assert response.ok, f"API request for process state has failed"
+        jobs = response.json()
         # Example response
-        # {
-        #   'data': {
-        #     'processjobs': [{'jobid': 226, 'processId': '1600173174.e2e_test..autoid.0', 'status': 'scheduled'}]
-        #   }
-        # }
-        jobs = process_jobs['data']['processjobs']
+        # [{'id': 226, 'status': 'scheduled'}]
         if not jobs:
             # Process has not yet started or does not exist
             return -1
@@ -645,7 +625,7 @@ class E2ETest:
                     return True
 
                 # count pending notifications or workflow starts
-                pending_messages = self.pending_messages([NOTIFY_EXCHANGE, WORKFLOW_QUEUE])
+                pending_messages = self.pending_messages()
 
                 if pending_messages == 0:
                     # No pending jobs and no pending messages
