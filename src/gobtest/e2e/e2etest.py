@@ -555,6 +555,7 @@ class E2ETest:
         :return:
         """
         url = f"{MANAGEMENT_API_BASE}/queues"
+        print("Get queues", url)
         response = requests.get(url)
         assert response.ok, f"API request for pending messages has failed"
         # Example response
@@ -584,6 +585,7 @@ class E2ETest:
         """
         url = f"{MANAGEMENT_API_BASE}/graphql"
         query = '{ processjobs(processId:"%s") { jobid processId status } }' % process_id
+        print("Get jobs", url, query)
         response = requests.post(url, json={'query': query})
         assert response.ok, f"API request for pending jobs has failed"
         process_jobs = response.json()
