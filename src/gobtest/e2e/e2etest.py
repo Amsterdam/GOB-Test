@@ -580,7 +580,9 @@ class E2ETest:
             # Process has not yet started or does not exist
             return -1
         # Process has started, return number of jobs that do not yet have finished
-        unfinished_jobs = [job for job in jobs if job['status'] != 'ended']
+        # A job is finished when it has ended or it has never started (rejected)
+        end_states = ['ended', 'rejected']
+        unfinished_jobs = [job for job in jobs if not job['status'] in end_states]
         return len(unfinished_jobs)
 
     def wait(self, process_id: str, max_seconds_to_try: int):

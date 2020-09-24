@@ -329,9 +329,11 @@ class TestE2Test(TestCase):
                     {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'any status'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'ended'},
+                    {'jobid': 1, 'processId': 'p1', 'status': 'rejected'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'started'},
                     {'jobid': 1, 'processId': 'p1', 'status': 'scheduled'}
                 ]
+        # A job is pending when it has not started of was rejected
         pending = e2e.pending_jobs('p1')
         self.assertEqual(pending, 4)
 
