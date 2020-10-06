@@ -22,17 +22,38 @@ class TestDataConsistencyTestInit(TestCase):
                 'enrich': {
                     'enrich_column': {},
                 }
-            }
+            },
+            'not_provided_attributes': [
+                'not_provided_attr_a',
+                'not_provided_attr_b',
+            ]
         }
 
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual('THE ENTITY ID', instance.entity_id_field)
         self.assertEqual('SioNo', instance.has_states)
 
-        # Check ignore columns is set and enrich_column is appended
-        self.assertTrue(len(instance.ignore_columns) > 1)
-        self.assertEqual('enrich_column', instance.ignore_columns[-1])
-        self.assertTrue(FIELD.SEQNR not in instance.ignore_columns)
+        self.assertEqual([
+            # Default
+            'ref',
+            '_source',
+            '_application',
+            '_source_id',
+            '_last_event',
+            '_hash',
+            '_version',
+            '_date_created',
+            '_date_confirmed',
+            '_date_modified',
+            '_date_deleted',
+            '_gobid',
+            '_id',
+            # Enriched
+            'enrich_column',
+            # From not_provided_attributes
+            'not_provided_attr_a',
+            'not_provided_attr_b'
+        ], instance.ignore_columns)
 
         self.assertEqual(mock_model.return_value.get_collection.return_value, instance.collection)
 

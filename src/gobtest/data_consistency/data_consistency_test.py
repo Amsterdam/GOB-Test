@@ -70,7 +70,8 @@ class DataConsistencyTest:
         self.compared_columns = []
 
         # Ignore enriched attributes by default
-        self.ignore_columns = self.default_ignore_columns + list(self.source.get('enrich', {}).keys())
+        self.ignore_columns = self.default_ignore_columns + list(self.source.get('enrich', {}).keys()) + \
+            self.import_definition.get('not_provided_attributes', [])
 
         # If the dataset is merged with another dataset the seqnr might be altered
         if self.is_merged:
