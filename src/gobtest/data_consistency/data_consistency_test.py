@@ -418,7 +418,6 @@ class DataConsistencyTest:
             json_source_data = self._load_json_source_data(attr_name, source_mapping, source_row)
 
             # For multi value JSON values we need to unpack the items to match the format in the analyse database
-            print(model_attr.get('attributes'))
             for nested_gob_key in model_attr.get('attributes'):
                 dst_key = f'{attr_name}_{nested_gob_key}'
 
