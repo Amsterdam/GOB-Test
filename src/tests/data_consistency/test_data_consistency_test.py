@@ -383,6 +383,32 @@ class TestDataConsistencyTest(TestCase):
                     'type': '',
                     'return': GOB.JSON
                 },
+                'i': {
+                    'type': '',
+                    'return': GOB.JSON,
+                    'has_multiple_values': True,
+                    'attributes': {
+                        "code": {
+                            "type": "GOB.String"
+                        },
+                        "omschrijving": {
+                            "type": "GOB.String"
+                        }
+                    }
+                },
+                'j': {
+                    'type': '',
+                    'return': GOB.JSON,
+                    'has_multiple_values': True,
+                    'attributes': {
+                        "code": {
+                            "type": "GOB.String"
+                        },
+                        "omschrijving": {
+                            "type": "GOB.String"
+                        }
+                    }
+                }
             }
         }
 
@@ -418,6 +444,12 @@ class TestDataConsistencyTest(TestCase):
                 'h': {
                     'source_mapping': 'col h',
                 },
+                'i': {
+                    'source_mapping': 'col i',
+                },
+                'j': {
+                    'source_mapping': 'col j',
+                }
             }
         }
 
@@ -427,7 +459,9 @@ class TestDataConsistencyTest(TestCase):
             'col b2': 'val b2',
             'col d': 'POINT(1 2)',
             'col g': 'val g',
-            'col h': 'this is not a json'
+            'col h': 'this is not a json',
+            'col i': [{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}],
+            'col j': '[{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}]'
         }
 
         expected_result = {
@@ -439,7 +473,11 @@ class TestDataConsistencyTest(TestCase):
             'd': 'normalised(POINT (1.000 2.000))',
             'e': inst.SKIP_VALUE,
             'f': inst.SKIP_VALUE,
-            'g_bronwaarde': 'val g'
+            'g_bronwaarde': 'val g',
+            'i_code': ['code_1', 'code_2'],
+            'i_omschrijving': ['omschrijving_1', 'omschrijving_2'],
+            'j_code': ['code_1', 'code_2'],
+            'j_omschrijving': ['omschrijving_1', 'omschrijving_2']
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
