@@ -101,9 +101,9 @@ sh test.sh
 
 # Remarks
 
-## Trigger tests
+## Run tests
 
-Tests are triggered by the GOB-Workflow module.
+The two test jobs in implemented in this repo can be started with the 'start workflow' functionality from GOB-Workflow.
 
 See the [GOB-Workflow README](https://github.com/Amsterdam/GOB-Workflow/blob/develop/README.md)  for more details how to start workflows.
 
