@@ -1,3 +1,4 @@
+import json
 import random
 import re
 import operator
@@ -404,14 +405,41 @@ class DataConsistencyTest:
         :return:
         """
         source_mapping = mapping['source_mapping']
+
+        model_attr = self.collection['all_fields'].get(attr_name)
+
         if isinstance(source_mapping, dict):
             for nested_gob_key, source_key in source_mapping.items():
                 # Skip values that are not found, e.g. BAG verblijfsobjecten fng_omschrijving that is set in code
                 dst_key = f'{attr_name}_{nested_gob_key}'
                 result[dst_key] = source_row.get(source_key, self.SKIP_VALUE)
+        elif model_attr.get('has_multiple_values'):
+            # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
+            json_source_data = self._load_json_source_data(attr_name, source_mapping, source_row)
+
+            # For multi value JSON values we need to unpack the items to match the format in the analyse database
+            for nested_gob_key in model_attr.get('attributes'):
+                dst_key = f'{attr_name}_{nested_gob_key}'
+
+                src_result = [obj[nested_gob_key] for obj in json_source_data] if json_source_data else None
+                result[dst_key] = src_result
         else:
             # Skip JSON's that are not imported per attribute
             self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non- or empty-JSON")
+
+    def _load_json_source_data(self, attr_name, source_mapping, source_row):
+        """
+        Try to load the json_data since we sometimes receive a string from the source database
+
+        :param attr_name:
+        :param source_mapping:
+        :param source_row:
+        :return:
+        """
+        try:
+            return json.loads(source_row.get(source_mapping))
+        except (TypeError, json.decoder.JSONDecodeError):
+            return source_row.get(source_mapping)
 
     def _transform_gob_row(self, gob_row: dict):
 
