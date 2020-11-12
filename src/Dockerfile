@@ -15,7 +15,13 @@ ENV ORACLE_DIR=/app/opt/oracle
 RUN mkdir -p ${ORACLE_DIR}
 RUN unzip drivers/instantclient-basic-linux.x64-18.3.0.0.0dbru.zip -d ${ORACLE_DIR}
 ENV LD_LIBRARY_PATH=${ORACLE_DIR}/instantclient_18_3:$LD_LIBRARY_PATH
-RUN apt-get install libaio1
+RUN apt-get -y install libaio1 unixodbc-dev apt-transport-https
+
+# Install SQL Server driver
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list
+RUN apt-get update
+RUN ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
 # Install required Python packages
 COPY requirements.txt /app/
