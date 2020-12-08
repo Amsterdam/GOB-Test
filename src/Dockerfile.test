@@ -3,7 +3,7 @@ FROM amsterdam/python:3.7-buster
 MAINTAINER datapunt@amsterdam.nl
 
 RUN apt-get update
-RUN apt-get install -y git unixodbc-dev
+RUN apt-get install -y git unixodbc-dev libgdal-dev
 
 # Install api service in /app folder
 WORKDIR /app
