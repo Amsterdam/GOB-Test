@@ -1,7 +1,7 @@
 FROM amsterdam/python:3.7-buster
 MAINTAINER datapunt@amsterdam.nl
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git libgdal-dev
 
 # Install gobtest in /app folder
 WORKDIR /app
