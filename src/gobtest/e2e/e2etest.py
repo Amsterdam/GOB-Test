@@ -91,7 +91,7 @@ class E2ETest:
         'rtd_manyref_to_d'
     ]
 
-    api_base = f"{API_HOST}/gob"
+    api_base = f"{API_HOST}/gob/public"
 
     clear_tests_endpoint = "/alltests/"
     check_import_endpoint = "/test_catalogue/test_entity/?ndjson=true"
