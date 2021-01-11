@@ -1,10 +1,10 @@
-{"identificatie": "0", "code": "code 0", "autoid": "123400000", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/0/"}}}
-{"identificatie": "1", "code": "1", "autoid": "123400002", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/1/"}}}
-{"identificatie": "2", "code": "00002", "autoid": "123400003", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/2/"}}}
-{"identificatie": "3", "code": "003", "autoid": "ABCD", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/3/"}}}
-{"identificatie": "4", "code": "A", "autoid": "123400004", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/4/"}}}
-{"identificatie": "5", "code": "XYZ005", "autoid": "123400012", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/5/"}}}
-{"identificatie": "6", "code": "B", "autoid": "123400013", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/6/"}}}
-{"identificatie": "7", "code": "00007", "autoid": "DEF", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/7/"}}}
-{"identificatie": "8", "code": "-5", "autoid": "123400014", "_links": {"self": {"href": "/gob/test_catalogue/test_entity_autoid/8/"}}}
+{"identificatie": "0", "code": "code 0", "autoid": "123400000", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/0/"}}}
+{"identificatie": "1", "code": "1", "autoid": "123400002", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/1/"}}}
+{"identificatie": "2", "code": "00002", "autoid": "123400003", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/2/"}}}
+{"identificatie": "3", "code": "003", "autoid": "ABCD", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/3/"}}}
+{"identificatie": "4", "code": "A", "autoid": "123400004", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/4/"}}}
+{"identificatie": "5", "code": "XYZ005", "autoid": "123400012", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/5/"}}}
+{"identificatie": "6", "code": "B", "autoid": "123400013", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/6/"}}}
+{"identificatie": "7", "code": "00007", "autoid": "DEF", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/7/"}}}
+{"identificatie": "8", "code": "-5", "autoid": "123400014", "_links": {"self": {"href": "/gob/public/test_catalogue/test_entity_autoid/8/"}}}
 
