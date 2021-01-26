@@ -13,7 +13,7 @@ import time
 from gobcore.logging.logger import logger
 from gobcore.message_broker.config import IMPORT, END_TO_END_CHECK, RELATE, END_TO_END_EXECUTE, END_TO_END_WAIT
 from gobcore.workflow.start_workflow import start_workflow
-from gobtest.config import API_HOST, MANAGEMENT_API_BASE
+from gobtest.config import API_HOST, MANAGEMENT_API_PUBLIC_BASE
 
 
 class E2ETest:
@@ -551,7 +551,7 @@ class E2ETest:
 
         :return: #pending messages
         """
-        url = f"{MANAGEMENT_API_BASE}/state/workflow"
+        url = f"{MANAGEMENT_API_PUBLIC_BASE}/state/workflow"
         response = requests.get(url)
         assert response.ok, f"API request for pending workflow messages has failed"
         workflow_queues = response.json()
@@ -570,7 +570,7 @@ class E2ETest:
         :param process_id:
         :return:
         """
-        url = f"{MANAGEMENT_API_BASE}/state/process/{process_id}"
+        url = f"{MANAGEMENT_API_PUBLIC_BASE}/state/process/{process_id}"
         response = requests.get(url)
         assert response.ok, f"API request for process state has failed"
         jobs = response.json()
