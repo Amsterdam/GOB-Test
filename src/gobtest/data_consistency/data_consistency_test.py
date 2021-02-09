@@ -395,6 +395,12 @@ class DataConsistencyTest:
 
         result[dst_key] = dst_value
 
+    def _format(self, format_def: dict, value):
+        if 'split' in format_def:
+            return [] if value is None else value.split(format_def['split'])
+
+        raise NotImplementedError("Format action not implemented")
+
     def _unpack_json(self, attr_name, mapping, source_row, result):
         """
         Unpack a JSON GOB field (not being a Reference, this is handled in _unpack_reference)
@@ -404,15 +410,22 @@ class DataConsistencyTest:
         :param source_row:
         :return:
         """
+        FORMAT = "format"
         source_mapping = mapping['source_mapping']
 
         model_attr = self.collection['all_fields'].get(attr_name)
 
         if isinstance(source_mapping, dict):
             for nested_gob_key, source_key in source_mapping.items():
+                if nested_gob_key == FORMAT:
+                    continue
                 # Skip values that are not found, e.g. BAG verblijfsobjecten fng_omschrijving that is set in code
                 dst_key = f'{attr_name}_{nested_gob_key}'
                 result[dst_key] = source_row.get(source_key, self.SKIP_VALUE)
+
+                if FORMAT in source_mapping:
+                    result[dst_key] = self._format(source_mapping[FORMAT], result[dst_key])
+
         elif model_attr.get('has_multiple_values'):
             # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
             json_source_data = self._load_json_source_data(attr_name, source_mapping, source_row)
