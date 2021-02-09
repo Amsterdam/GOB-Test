@@ -408,6 +408,32 @@ class TestDataConsistencyTest(TestCase):
                             "type": "GOB.String"
                         }
                     }
+                },
+                'k': {
+                    'type': '',
+                    'return': GOB.JSON,
+                    'has_multiple_values': True,
+                    'attributes': {
+                        'code': {
+                            'type': 'GOB.String',
+                        },
+                        'omschrijving': {
+                            'type': 'GOB.String',
+                        }
+                    }
+                },
+                'l': {
+                    'type': '',
+                    'return': GOB.JSON,
+                    'has_multiple_values': True,
+                    'attributes': {
+                        'code': {
+                            'type': 'GOB.String',
+                        },
+                        'omschrijving': {
+                            'type': 'GOB.String',
+                        }
+                    }
                 }
             }
         }
@@ -449,6 +475,22 @@ class TestDataConsistencyTest(TestCase):
                 },
                 'j': {
                     'source_mapping': 'col j',
+                },
+                'k': {
+                    'source_mapping': {
+                        'omschrijving': 'col k',
+                        'format': {
+                            'split': ';'
+                        }
+                    }
+                },
+                'l': {
+                    'source_mapping': {
+                        'omschrijving': 'col l',
+                        'format': {
+                            'split': ';'
+                        }
+                    }
                 }
             }
         }
@@ -461,7 +503,9 @@ class TestDataConsistencyTest(TestCase):
             'col g': 'val g',
             'col h': 'this is not a json',
             'col i': [{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}],
-            'col j': '[{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}]'
+            'col j': '[{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}]',
+            'col k': 'A;B;C',
+            'col l': None,
         }
 
         expected_result = {
@@ -477,10 +521,17 @@ class TestDataConsistencyTest(TestCase):
             'i_code': ['code_1', 'code_2'],
             'i_omschrijving': ['omschrijving_1', 'omschrijving_2'],
             'j_code': ['code_1', 'code_2'],
-            'j_omschrijving': ['omschrijving_1', 'omschrijving_2']
+            'j_omschrijving': ['omschrijving_1', 'omschrijving_2'],
+            'k_omschrijving': ['A', 'B', 'C'],
+            'l_omschrijving': [],
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
+
+    def test_format_not_implemented(self):
+        inst = DataConsistencyTest('cat', 'col')
+        with self.assertRaises(NotImplementedError):
+            inst._format({}, 'some value')
 
     def test_transform_source_value(self):
         inst = DataConsistencyTest('cat', 'col')
