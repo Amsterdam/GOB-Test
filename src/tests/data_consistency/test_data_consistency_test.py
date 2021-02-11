@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock, call
 
 import datetime
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD, NotImplementedCatalogError
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD, NotImplementedCatalogError, NotImplementedApplicationError
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
 
@@ -73,6 +73,10 @@ class TestDataConsistencyTestInit(TestCase):
     def test_init_rel(self, mock_model, mock_get_import_definition):
         with self.assertRaises(NotImplementedCatalogError):
             DataConsistencyTest('rel', 'some coll', 'some app')
+
+    def test_init_bagextarct(self, mock_model, mock_get_import_definition):
+        with self.assertRaises(NotImplementedApplicationError):
+            DataConsistencyTest('cat', 'coll', 'BAGExtract')
 
     def test_init_skip_secure_attributes(self, mock_model, mock_get_import_definition):
         mock_get_import_definition.return_value = {
