@@ -26,6 +26,10 @@ class NotImplementedCatalogError(GOBException):
     pass
 
 
+class NotImplementedApplicationError(GOBException):
+    pass
+
+
 class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
@@ -56,6 +60,9 @@ class DataConsistencyTest:
 
         if catalog_name == 'rel':
             raise NotImplementedCatalogError("Not implemented for the 'rel' catalog")
+
+        if application == 'BAGExtract':
+            raise NotImplementedApplicationError("Not implemented for BAGExtract")
 
         self.import_definition = get_import_definition(catalog_name, collection_name, application)
         self.source = self.import_definition['source']

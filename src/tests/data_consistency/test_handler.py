@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch, ANY
 
 from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle, GOBConfigException, \
-    NotImplementedCatalogError, DataConsistencyTest
+    NotImplementedCatalogError, NotImplementedApplicationError
 
 
 class TestDataConsistencyTestHandler(TestCase):
@@ -64,6 +64,13 @@ class TestDataConsistencyTestHandler(TestCase):
         result = can_handle("cat", "col", "app")
         self.assertEqual(result, True)
 
-        mock_data_consistency_test.side_effect = GOBConfigException
-        result = can_handle("cat", "col", "app")
-        self.assertIsNone(result)
+        side_effects = [
+            GOBConfigException,
+            NotImplementedCatalogError,
+            NotImplementedApplicationError
+        ]
+
+        for side_effect in side_effects:
+            mock_data_consistency_test.side_effect = side_effect
+            result = can_handle("cat", "col", "app")
+            self.assertIsNone(result)
