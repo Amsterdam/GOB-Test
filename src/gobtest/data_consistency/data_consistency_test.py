@@ -520,7 +520,8 @@ WHERE
             # Skip any None values from the source list
             src_value = ','.join(sorted([str(v).strip() for v in src_value if v is not None]))
             # Rebuild the GOB list from the string, skipping empty values
-            gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v]))
+            gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v])) \
+                if isinstance(gob_value, str) else gob_value
             return src_value == gob_value
         else:
             # Compare the two values as string without whitespace, case-insensitive
