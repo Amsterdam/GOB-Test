@@ -760,6 +760,7 @@ WHERE
         inst.is_merged = True
         # If the dataset is merged with another dataset the sequence number is not guaranteed to match
         # Instead the last known entity is retrieved, independent of the sequence number
+        # i.e. get the rows with no expiration date
         inst._get_matching_gob_row(source_row)
         inst.analyse_db.read.assert_called_with("""\
 SELECT
@@ -770,6 +771,7 @@ WHERE
     _source = 'any source' AND
     _application = 'any application' AND
     _date_deleted IS NULL AND
+    _expiration_date IS NULL AND
     _source_id LIKE 'ID.%'
 """)
 

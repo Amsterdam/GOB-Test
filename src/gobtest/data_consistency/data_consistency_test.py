@@ -593,6 +593,8 @@ WHERE
                 source_id = f"{source_id}.%"
                 # Compare source ids with wildcard comparison for the sequence number
                 is_source_id = "LIKE"
+                # Make sure only the last known entity is retrieved
+                where.append(f"{FIELD.EXPIRATION_DATE} IS NULL")
             else:
                 seq_nr = source_row[self.import_definition['gob_mapping'][FIELD.SEQNR]['source_mapping']]
                 # Select matching sequence number
