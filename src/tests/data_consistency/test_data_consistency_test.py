@@ -215,8 +215,8 @@ class TestDataConsistencyTest(TestCase):
         inst._connect = MagicMock()
         inst.has_states = False
         inst._get_row_id = lambda x: 'row id'
-        inst._get_matching_gob_row = MagicMock(side_effect=lambda x: x * 2 if x * 2 % 10 != 0 else None)
-        inst._validate_row = MagicMock(side_effect=lambda x, y: x % 6 == 0)
+        inst._get_matching_gob_rows = MagicMock(side_effect=lambda x: x * 2 if x * 2 % 10 != 0 else None)
+        inst._validate_minimal_one_row = MagicMock(side_effect=lambda x, y: x % 6 == 0)
         inst._get_source_data = MagicMock(return_value=[
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         ])
@@ -224,13 +224,13 @@ class TestDataConsistencyTest(TestCase):
 
         inst.run()
         mock_random.randint.assert_called_with(0, 3)
-        inst._get_matching_gob_row.assert_has_calls([
+        inst._get_matching_gob_rows.assert_has_calls([
             call(0),
             call(2),
             call(6),
             call(10),
         ])
-        inst._validate_row.assert_has_calls([
+        inst._validate_minimal_one_row.assert_has_calls([
             call(2, 4),
             call(6, 12),
         ])
@@ -265,8 +265,8 @@ class TestDataConsistencyTest(TestCase):
         }
         inst.is_merged = True
         inst._get_expected_merge_cnt = MagicMock(return_value=13)
-        inst._get_matching_gob_row = MagicMock(side_effect=lambda x: {'id': x['id'] * 2} if x['id'] * 2 % 10 != 0 else None)
-        inst._validate_row = MagicMock(side_effect=lambda x, y: x['id'] % 6 == 0)
+        inst._get_matching_gob_rows = MagicMock(side_effect=lambda x: {'id': x['id'] * 2} if x['id'] * 2 % 10 != 0 else None)
+        inst._validate_minimal_one_row = MagicMock(side_effect=lambda x, y: x['id'] % 6 == 0)
         inst._get_source_data = MagicMock(return_value=[{'id': x} for x in [
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
         ]])
@@ -274,13 +274,13 @@ class TestDataConsistencyTest(TestCase):
 
         inst.run()
         mock_random.randint.assert_called_with(0, 3)
-        inst._get_matching_gob_row.assert_has_calls([
+        inst._get_matching_gob_rows.assert_has_calls([
             call({'id': 0}),
             call({'id': 2}),
             call({'id': 6}),
             call({'id': 10}),
         ])
-        inst._validate_row.assert_has_calls([
+        inst._validate_minimal_one_row.assert_has_calls([
             call({'id': 2}, {'id': 4}),
             call({'id': 6}, {'id': 12}),
         ])
@@ -646,22 +646,22 @@ class TestDataConsistencyTest(TestCase):
         inst._transform_gob_row = lambda x: x
         inst._transform_source_row = lambda x: x
 
-        inst._validate_row({}, {})
+        inst._validate_minimal_one_row({}, [{}])
         mock_logger.error_assert_not_called()
 
-        inst._validate_row({'a': 'aa'}, {'a': 'aa'})
+        inst._validate_minimal_one_row({'a': 'aa'}, [{'a': 'aa'}])
         mock_logger.error_assert_not_called()
 
-        inst._validate_row(
+        inst._validate_minimal_one_row(
             {'a': 'aa'},
-            {'a': 'ab'},
+            [{'a': 'ab'}],
         )
         mock_logger.error.assert_called_once()
 
         mock_logger.error.reset_mock()
-        inst._validate_row(
+        inst._validate_minimal_one_row(
             {'a': 'aa'},
-            {},
+            [{}],
         )
         self.assertEqual(inst.gob_key_errors['a'], 'Missing key a in GOB')
         inst._log_result(0, 0, 0, 0, 0)
@@ -674,9 +674,9 @@ class TestDataConsistencyTest(TestCase):
         inst.src_key_warnings = {
             'a': 'something wrong with a'
         }
-        inst._validate_row(
+        inst._validate_minimal_one_row(
             {'a': 'aa'},
-            {},
+            [{}],
         )
         self.assertIsNone(inst.gob_key_errors.get('a'))
         inst._log_result(0, 0, 0, 0, 0)
@@ -685,9 +685,9 @@ class TestDataConsistencyTest(TestCase):
 
         mock_logger.error.reset_mock()
         mock_logger.warning.reset_mock()
-        inst._validate_row(
+        inst._validate_minimal_one_row(
             {},
-            {'a': 'aa'}
+            [{'a': 'aa'}]
         )
         self.assertEqual(inst.gob_key_errors['a'], 'Have unexpected key left in GOB: a')
         inst._log_result(0, 0, 0, 0, 0)
@@ -697,11 +697,11 @@ class TestDataConsistencyTest(TestCase):
 
         # First 0 errors, last call contains 1 errors, so no success.
         mock_logger.get_errors.side_effect = [[], [1]]
-        self.assertFalse(inst._validate_row({}, {}))
+        self.assertFalse(inst._validate_minimal_one_row({}, [{}]))
 
         # Errors are empty during both calls, which means no extra errors are logged
         mock_logger.get_errors.side_effect = [[], []]
-        self.assertTrue(inst._validate_row({}, {}))
+        self.assertTrue(inst._validate_minimal_one_row({}, [{}]))
 
     def test_get_row_id(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -743,7 +743,7 @@ class TestDataConsistencyTest(TestCase):
             'volgnr': 'SEQNR'
         }
 
-        self.assertEqual({'the': 'row'}, inst._get_matching_gob_row(source_row))
+        self.assertEqual([{'the': 'row'}], inst._get_matching_gob_rows(source_row))
         inst.analyse_db.read.assert_called_with("""\
 SELECT
     *
@@ -760,8 +760,8 @@ WHERE
         inst.is_merged = True
         # If the dataset is merged with another dataset the sequence number is not guaranteed to match
         # Instead the last known entity is retrieved, independent of the sequence number
-        # i.e. get the rows with no expiration date
-        inst._get_matching_gob_row(source_row)
+
+        inst._get_matching_gob_rows(source_row)
         inst.analyse_db.read.assert_called_with("""\
 SELECT
     *
@@ -771,7 +771,6 @@ WHERE
     _source = 'any source' AND
     _application = 'any application' AND
     _date_deleted IS NULL AND
-    _expiration_date IS NULL AND
     _source_id LIKE 'ID.%'
 """)
 
