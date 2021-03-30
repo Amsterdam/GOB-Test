@@ -8,13 +8,21 @@ services:
     environment:
       MESSAGE_BROKER_ADDRESS: rabbitmq
       API_HOST: http://gobapi:8001
+      GOB_SHARED_DIR: /app/shared
       MANAGEMENT_API_HOST: http://gobmanagement:8001
       ANALYSE_DATABASE_USER: gob
       ANALYSE_DATABASE_PASSWORD: insecure
       ANALYSE_DATABASE_HOST_OVERRIDE: analyse_database
       ANALYSE_DATABASE_PORT_OVERRIDE: 5432
       ANALYSE_DATABASE: gob_analyse
+    volumes:
+      - gob-volume:/app/shared
+
 networks:
   default:
     external:
       name: gob-network
+
+volumes:
+  gob-volume:
+    external: true
