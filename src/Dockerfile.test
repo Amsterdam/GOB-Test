@@ -1,23 +1,35 @@
-FROM amsterdam/python:3.7-buster
-
+FROM amsterdam/python:3.9-buster
 MAINTAINER datapunt@amsterdam.nl
 
-RUN apt-get update
-RUN apt-get install -y git unixodbc-dev libgdal-dev
-
-# Install api service in /app folder
+# Install gobtest in /app folder
 WORKDIR /app
+
+RUN apt-get update && apt-get -y --no-install-recommends install unixodbc-dev libgdal-dev
+
+# Update C env vars so compiler can find gdal
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+
+# Install SQL Server driver
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+RUN curl https://packages.microsoft.com/config/debian/9/prod.list > /etc/apt/sources.list.d/mssql-release.list
+RUN apt-get update
+RUN ACCEPT_EULA=Y apt-get install -y msodbcsql17
 
 # Install required Python packages
 COPY requirements.txt /app/
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN LIBGDAL_VERSION=$(gdal-config --version) pip3 install --no-cache-dir -r requirements.txt
 RUN rm requirements.txt
+RUN rm -rf /app/src/gobcore/tests
 
+# Copy gobtest module
 COPY gobtest gobtest
 
-# Copy tests
+# Copy test module
 COPY tests tests
-COPY .flake8 .flake8
-COPY test.sh test.sh
 
-CMD ["python", "-m", "gobtest"]
+# Copy tests
+COPY test.sh .flake8 ./
+
+# Copy jenkins files
+COPY .jenkins /.jenkins
