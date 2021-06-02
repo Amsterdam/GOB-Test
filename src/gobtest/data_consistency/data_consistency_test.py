@@ -48,6 +48,7 @@ class DataConsistencyTest:
         FIELD.DATE_DELETED,
         FIELD.GOBID,
         FIELD.ID,
+        FIELD.TID,
     ]
 
     # If no mapping exist for a value, the mapping might be implicit
