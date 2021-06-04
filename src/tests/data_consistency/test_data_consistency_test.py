@@ -48,6 +48,7 @@ class TestDataConsistencyTestInit(TestCase):
             '_date_deleted',
             '_gobid',
             '_id',
+            '_tid',
             # Enriched
             'enrich_column',
             # From not_provided_attributes
