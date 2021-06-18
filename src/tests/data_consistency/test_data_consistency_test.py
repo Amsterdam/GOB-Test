@@ -740,7 +740,7 @@ class TestDataConsistencyTest(TestCase):
             }
         }
         source_row = {
-            'idfield': 'ID',
+            'idfield': "ID%'",
             'volgnr': 'SEQNR'
         }
 
@@ -755,7 +755,7 @@ WHERE
     _application = 'any application' AND
     _date_deleted IS NULL AND
     volgnummer = 'SEQNR' AND
-    _source_id = 'ID.SEQNR'
+    _source_id = 'ID%%''.SEQNR'
 """)
 
         inst.is_merged = True
@@ -772,7 +772,7 @@ WHERE
     _source = 'any source' AND
     _application = 'any application' AND
     _date_deleted IS NULL AND
-    _source_id LIKE 'ID.%'
+    _source_id LIKE 'ID%%''.%'
 """)
 
     def test_get_source_data(self):
