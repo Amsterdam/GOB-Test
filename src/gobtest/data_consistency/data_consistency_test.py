@@ -30,6 +30,11 @@ class NotImplementedApplicationError(GOBException):
     pass
 
 
+def escape(value):
+    """Properly escape values in string query."""
+    return value.replace("'", "''").replace("%", "%%") if isinstance(value, str) else value
+
+
 class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
@@ -608,7 +613,7 @@ WHERE
         is_source_id = "="
         if self.has_states:
             if self.is_merged:
-                source_id = f"{source_id}.%"
+                source_id = f"{escape(source_id)}.%"
                 # Compare source ids with wildcard comparison for the sequence number
                 is_source_id = "LIKE"
             else:
@@ -616,7 +621,7 @@ WHERE
                 # Select matching sequence number
                 where.append(f"{FIELD.SEQNR} = '{seq_nr}'")
                 # GOB populates the source_id with the sequence number
-                source_id = f"{source_id}.{seq_nr}"
+                source_id = f"{escape(source_id)}.{seq_nr}"
 
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
