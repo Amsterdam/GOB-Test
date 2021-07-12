@@ -606,14 +606,14 @@ WHERE
         :return:
         """
         source_def = self.import_definition['source']
-        source_id = source_row[source_def['entity_id']]
+        source_id = escape(source_row[source_def['entity_id']])
 
         where = []
         # Compare source ids on equality (=)
         is_source_id = "="
         if self.has_states:
             if self.is_merged:
-                source_id = f"{escape(source_id)}.%"
+                source_id = f"{source_id}.%"
                 # Compare source ids with wildcard comparison for the sequence number
                 is_source_id = "LIKE"
             else:
@@ -621,7 +621,7 @@ WHERE
                 # Select matching sequence number
                 where.append(f"{FIELD.SEQNR} = '{seq_nr}'")
                 # GOB populates the source_id with the sequence number
-                source_id = f"{escape(source_id)}.{seq_nr}"
+                source_id = f"{source_id}.{seq_nr}"
 
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
