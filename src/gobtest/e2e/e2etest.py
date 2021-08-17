@@ -136,7 +136,7 @@ class E2ETest:
     def cleartests(self):
         r = requests.delete(f"{self.api_base}{self.clear_tests_endpoint}")
         if r.status_code != 200:
-            self._log_error(f"Error clearing tests")
+            self._log_error("Error clearing tests")
 
     def _check_api_output(self, endpoint: str, expect: str, step_name: str):
         def sort_lines(data: str):
@@ -553,7 +553,7 @@ class E2ETest:
         """
         url = f"{MANAGEMENT_API_PUBLIC_BASE}/state/workflow"
         response = requests.get(url)
-        assert response.ok, f"API request for pending workflow messages has failed"
+        assert response.ok, "API request for pending workflow messages has failed"
         workflow_queues = response.json()
         # Example response
         # [{'name': ..., 'messages_unacknowledged': ...}, {...}]
@@ -572,7 +572,7 @@ class E2ETest:
         """
         url = f"{MANAGEMENT_API_PUBLIC_BASE}/state/process/{process_id}"
         response = requests.get(url)
-        assert response.ok, f"API request for process state has failed"
+        assert response.ok, "API request for process state has failed"
         jobs = response.json()
         # Example response
         # [{'id': 226, 'status': 'scheduled'}]
