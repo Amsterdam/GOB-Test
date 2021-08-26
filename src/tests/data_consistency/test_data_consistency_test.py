@@ -451,6 +451,10 @@ class TestDataConsistencyTest(TestCase):
                             'type': 'GOB.String',
                         }
                     }
+                },
+                'n': {
+                    'type': 'GOB.String',
+                    'return': GOB.String,
                 }
             }
         }
@@ -511,6 +515,9 @@ class TestDataConsistencyTest(TestCase):
                 },
                 'm': {
                     'source_mapping': 'col m'
+                },
+                'n': {
+                    'source_mapping': '=CONSTANT'
                 }
             }
         }
@@ -526,7 +533,8 @@ class TestDataConsistencyTest(TestCase):
             'col j': '[{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}]',
             'col k': 'A;B;C',
             'col l': None,
-            'col m': '2020-00-00'
+            'col m': '2020-00-00',
+            'col n': None
         }
 
         expected_result = {
@@ -546,7 +554,8 @@ class TestDataConsistencyTest(TestCase):
             'k_omschrijving': ['A', 'B', 'C'],
             'l_omschrijving': [],
             'm_formatted': '2020-00-00',
-            'm_year': 2020
+            'm_year': 2020,
+            'n': 'CONSTANT'
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
