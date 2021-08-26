@@ -13,7 +13,7 @@ from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
 from gobcore.typesystem import get_gob_type_from_info
-from gobcore.typesystem.gob_types import Reference, JSON
+from gobcore.typesystem.gob_types import Reference, JSON, IncompleteDate
 from gobcore.typesystem.gob_secure_types import Secure
 from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.exceptions import GOBTypeException
@@ -439,6 +439,17 @@ class DataConsistencyTest:
 
                 if FORMAT in source_mapping:
                     result[dst_key] = self._format(source_mapping[FORMAT], result[dst_key])
+
+        elif IncompleteDate.name in model_attr['type']:
+            # Only unpack available attributes from model
+            # source_mapping should be a str referring to the source column with json data
+            for nested_gob_key in model_attr['attributes']:
+                value = source_row.get(source_mapping, self.SKIP_VALUE)
+
+                if value != self.SKIP_VALUE:
+                    value = IncompleteDate(value).to_value[nested_gob_key]
+
+                result[f'{attr_name}_{nested_gob_key}'] = value
 
         elif model_attr.get('has_multiple_values'):
             # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
