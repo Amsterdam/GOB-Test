@@ -29,7 +29,7 @@ class E2ETest:
     test_catalog = "test_catalogue"
 
     test_import_entity = "test_entity"
-    test_import_entity_ref = "test_entity_ref"
+    test_import_entity_ref = "test_entity_reference"
     test_import_entity_autoid = "test_entity_autoid"
     test_import_entity_autoid_states = "test_entity_autoid_states"
     test_import_entity_reference = "reference"
