@@ -439,6 +439,18 @@ class TestDataConsistencyTest(TestCase):
                             'type': 'GOB.String',
                         }
                     }
+                },
+                'm': {
+                    'type': 'GOB.IncompleteDate',
+                    'return': GOB.IncompleteDate,
+                    'attributes': {
+                        'formatted': {
+                            'type': 'GOB.String',
+                        },
+                        'year': {
+                            'type': 'GOB.String',
+                        }
+                    }
                 }
             }
         }
@@ -496,6 +508,9 @@ class TestDataConsistencyTest(TestCase):
                             'split': ';'
                         }
                     }
+                },
+                'm': {
+                    'source_mapping': 'col m'
                 }
             }
         }
@@ -511,6 +526,7 @@ class TestDataConsistencyTest(TestCase):
             'col j': '[{"code": "code_1", "omschrijving": "omschrijving_1"}, {"code": "code_2", "omschrijving": "omschrijving_2"}]',
             'col k': 'A;B;C',
             'col l': None,
+            'col m': '2020-00-00'
         }
 
         expected_result = {
@@ -529,6 +545,8 @@ class TestDataConsistencyTest(TestCase):
             'j_omschrijving': ['omschrijving_1', 'omschrijving_2'],
             'k_omschrijving': ['A', 'B', 'C'],
             'l_omschrijving': [],
+            'm_formatted': '2020-00-00',
+            'm_year': 2020
         }
 
         self.assertEqual(expected_result, inst._transform_source_row(source_row))
