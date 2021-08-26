@@ -324,6 +324,7 @@ class DataConsistencyTest:
         :return:
         """
         attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
+        unpack_types = (Reference, JSON, IncompleteDate)
 
         result = {}
 
@@ -335,15 +336,14 @@ class DataConsistencyTest:
                 self._src_key_warning(attr_name, f"Skipped {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping['source_mapping']
-                type = get_gob_type_from_info(attr)
-                if issubclass(type, Reference):
-                    self._unpack_reference(type, attr_name, mapping, source_row, result)
+                type_ = get_gob_type_from_info(attr)
+
+                if issubclass(type_, unpack_types):
+                    self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
-                elif issubclass(type, JSON):
-                    self._unpack_json(attr_name, mapping, source_row, result)
-                    continue
+
                 elif source_mapping in source_row:
-                    value = self._transform_source_value(type, source_row[source_mapping], mapping)
+                    value = self._transform_source_value(type_, source_row[source_mapping], mapping)
                 else:
                     self._src_key_warning(attr_name, f"Skipped {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
@@ -351,6 +351,29 @@ class DataConsistencyTest:
             result[attr_name] = value
 
         return result
+
+    def _unpack(self, type_, attr_name: str, mapping: dict, source_row: dict, result: dict):
+        args = (attr_name, mapping, source_row, result)
+        if issubclass(type_, Reference):
+            self._unpack_reference(type_, *args)
+        elif issubclass(type_, IncompleteDate):
+            self._unpack_incomplete_date(*args)
+        else:
+            self._unpack_json(*args)
+
+    def _unpack_incomplete_date(self, attr_name, mapping, source_row, result):
+        # Only unpack available attributes from model
+        # source_mapping should be a str referring to the source column with json data
+        source_mapping = mapping['source_mapping']
+        model_attr = self.collection['all_fields'].get(attr_name)
+
+        for nested_gob_key in model_attr['attributes']:
+            value = source_row.get(source_mapping, self.SKIP_VALUE)
+
+            if value != self.SKIP_VALUE:
+                value = IncompleteDate(value).to_value[nested_gob_key]
+
+            result[f'{attr_name}_{nested_gob_key}'] = value
 
     def _unpack_string_list(self, s):
         """
@@ -439,17 +462,6 @@ class DataConsistencyTest:
 
                 if FORMAT in source_mapping:
                     result[dst_key] = self._format(source_mapping[FORMAT], result[dst_key])
-
-        elif IncompleteDate.name in model_attr['type']:
-            # Only unpack available attributes from model
-            # source_mapping should be a str referring to the source column with json data
-            for nested_gob_key in model_attr['attributes']:
-                value = source_row.get(source_mapping, self.SKIP_VALUE)
-
-                if value != self.SKIP_VALUE:
-                    value = IncompleteDate(value).to_value[nested_gob_key]
-
-                result[f'{attr_name}_{nested_gob_key}'] = value
 
         elif model_attr.get('has_multiple_values'):
             # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
