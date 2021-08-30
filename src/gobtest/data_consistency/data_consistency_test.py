@@ -324,8 +324,6 @@ class DataConsistencyTest:
         :return:
         """
         attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
-        unpack_types = (Reference, JSON, IncompleteDate)
-
         result = {}
 
         for attr_name, attr in attributes.items():
@@ -338,10 +336,9 @@ class DataConsistencyTest:
                 source_mapping = mapping['source_mapping']
                 type_ = get_gob_type_from_info(attr)
 
-                if issubclass(type_, unpack_types):
+                if issubclass(type_, JSON):
                     self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
-
                 elif source_mapping in source_row:
                     value = self._transform_source_value(type_, source_row[source_mapping], mapping)
                 else:
@@ -355,6 +352,7 @@ class DataConsistencyTest:
     def _unpack(self, type_, attr_name: str, mapping: dict, source_row: dict, result: dict):
         args = (attr_name, mapping, source_row, result)
         if issubclass(type_, Reference):
+            # Reference, ManyReference and VeryManyReference
             self._unpack_reference(type_, *args)
         elif issubclass(type_, IncompleteDate):
             self._unpack_incomplete_date(*args)
