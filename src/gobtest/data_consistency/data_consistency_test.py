@@ -13,7 +13,7 @@ from gobconfig.datastore.config import get_datastore_config
 from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
 from gobcore.typesystem import get_gob_type_from_info
-from gobcore.typesystem.gob_types import Reference, JSON
+from gobcore.typesystem.gob_types import Reference, JSON, IncompleteDate
 from gobcore.typesystem.gob_secure_types import Secure
 from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.exceptions import GOBTypeException
@@ -324,7 +324,6 @@ class DataConsistencyTest:
         :return:
         """
         attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
-
         result = {}
 
         for attr_name, attr in attributes.items():
@@ -335,15 +334,13 @@ class DataConsistencyTest:
                 self._src_key_warning(attr_name, f"Skipped {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping['source_mapping']
-                type = get_gob_type_from_info(attr)
-                if issubclass(type, Reference):
-                    self._unpack_reference(type, attr_name, mapping, source_row, result)
-                    continue
-                elif issubclass(type, JSON):
-                    self._unpack_json(attr_name, mapping, source_row, result)
+                type_ = get_gob_type_from_info(attr)
+
+                if issubclass(type_, JSON):
+                    self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
                 elif source_mapping in source_row:
-                    value = self._transform_source_value(type, source_row[source_mapping], mapping)
+                    value = self._transform_source_value(type_, source_row[source_mapping], mapping)
                 else:
                     self._src_key_warning(attr_name, f"Skipped {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
@@ -351,6 +348,30 @@ class DataConsistencyTest:
             result[attr_name] = value
 
         return result
+
+    def _unpack(self, type_, attr_name: str, mapping: dict, source_row: dict, result: dict):
+        args = (attr_name, mapping, source_row, result)
+        if issubclass(type_, Reference):
+            # Reference, ManyReference and VeryManyReference
+            self._unpack_reference(type_, *args)
+        elif issubclass(type_, IncompleteDate):
+            self._unpack_incomplete_date(*args)
+        else:
+            self._unpack_json(*args)
+
+    def _unpack_incomplete_date(self, attr_name, mapping, source_row, result):
+        # Only unpack available attributes from model
+        # source_mapping should be a str referring to the source column with json data
+        source_mapping = mapping['source_mapping']
+        model_attr = self.collection['all_fields'].get(attr_name)
+
+        for nested_gob_key in model_attr['attributes']:
+            value = source_row.get(source_mapping, self.SKIP_VALUE)
+
+            if value != self.SKIP_VALUE:
+                value = IncompleteDate(value).to_value[nested_gob_key]
+
+            result[f'{attr_name}_{nested_gob_key}'] = value
 
     def _unpack_string_list(self, s):
         """
