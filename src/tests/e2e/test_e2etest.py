@@ -184,8 +184,8 @@ class TestE2Test(TestCase):
         e2e._wait_step_workflow_definition = lambda process_id, seconds=10: f"wait {seconds} for {process_id}"
 
         expect = [
-            (['import test cat,test_entity_ref,ADD',
-              'import test cat,test_entity_ref,MODIFY1',
+            (['import test cat,test_entity_reference,ADD',
+              'import test cat,test_entity_reference,MODIFY1',
               'import test cat,import entity,src A',
               'relate test cat,import entity,reference'],
              'process_id.import_test.src A.0'),

@@ -339,6 +339,8 @@ class DataConsistencyTest:
                 if issubclass(type_, JSON):
                     self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
+                elif source_mapping and source_mapping[0] == '=':
+                    value = self._transform_source_value(type_, source_mapping[1:], mapping)
                 elif source_mapping in source_row:
                     value = self._transform_source_value(type_, source_row[source_mapping], mapping)
                 else:
