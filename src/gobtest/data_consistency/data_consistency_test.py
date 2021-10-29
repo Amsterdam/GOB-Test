@@ -654,7 +654,9 @@ WHERE
         return [dict(res) for res in result] if result else None
 
     def _get_source_data(self):
-        return self.src_datastore.query("\n".join(self.source.get('query', [])))
+        """Get the source data using a server-side cursor."""
+        qry = '\n'.join(self.source.get('query', []))
+        return self.src_datastore.query(qry, name='test_src_db_cursor', arraysize=2_000, withhold=True)
 
     def _get_merge_data(self):
         """Returns the data from the merge source for this import
@@ -682,7 +684,7 @@ WHERE
 
     def _read_from_analyse_db(self, query):
         """
-        Read from the analyse db. Reconnect if any query fails.
+        Read from the analyse db using server-side cursor. Reconnect if any query fails.
         autocommit = True on the connection would also solve the problem
         but this logic is independent from the DatastoreFactory implementation
 
@@ -690,7 +692,7 @@ WHERE
         :return:
         """
         try:
-            return self.analyse_db.read(query)
+            return self.analyse_db.query(query, name='test_analyse_db_cursor', arraysize=2_000, withhold=True)
         except GOBException as e:
             print("Query failed", str(e), query)
             # If autocommit = False the connection will be blocked for further queries
