@@ -326,10 +326,15 @@ class TestDataConsistencyTest(TestCase):
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
         inst.analyse_db = MagicMock()
-        inst.analyse_db.read.return_value = [['WKT VAL']]
+        inst.analyse_db.query.return_value = [['WKT VAL']]
+        query_kwargs = {
+            'name': 'test_analyse_db_cursor',
+            'arraysize': 2000,
+            'withhold': True
+        }
 
         self.assertEqual('WKT VAL', inst._geometry_to_wkt('geoval'))
-        inst.analyse_db.read.assert_called_with("SELECT ST_AsText('geoval'::geometry)")
+        inst.analyse_db.query.assert_called_with("SELECT ST_AsText('geoval'::geometry)", **query_kwargs)
 
         self.assertIsNone(inst._geometry_to_wkt(None))
 
@@ -808,9 +813,14 @@ WHERE
         inst.source = {
             'query': ['a', 'b', 'c']
         }
+        query_kwargs = {
+            'name': 'test_src_db_cursor',
+            'arraysize': 2000,
+            'withhold': True
+        }
 
         self.assertEqual(inst.src_datastore.query.return_value, inst._get_source_data())
-        inst.src_datastore.query.assert_called_with('a\nb\nc')
+        inst.src_datastore.query.assert_called_with('a\nb\nc', **query_kwargs)
 
     @patch("gobtest.data_consistency.data_consistency_test.DatastoreFactory")
     @patch("gobtest.data_consistency.data_consistency_test.get_datastore_config", lambda x: x + '_CONFIG')
@@ -845,9 +855,9 @@ WHERE
     def test_read_from_analyse_db(self):
         inst = DataConsistencyTest('cat', 'col')
         inst.analyse_db = MagicMock()
-        inst.analyse_db.read.side_effect = lambda query: "any result"
+        inst.analyse_db.query.side_effect = lambda query, name, arraysize, withhold: "any result"
         self.assertEqual(inst._read_from_analyse_db("any query"), "any result")
-        inst.analyse_db.read.side_effect = GOBException("any GOB exception")
+        inst.analyse_db.query.side_effect = GOBException("any GOB exception")
         self.assertEqual(inst._read_from_analyse_db("any error query"), None)
 
     @patch("gobtest.data_consistency.data_consistency_test.DatastoreFactory")
