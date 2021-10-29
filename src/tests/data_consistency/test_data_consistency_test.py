@@ -7,6 +7,7 @@ from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, 
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
 
+
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition")
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel")
 class TestDataConsistencyTestInit(TestCase):
@@ -190,7 +191,9 @@ class TestDataConsistencyTestInit(TestCase):
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
         self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b_sub1', 'b_sub2'])
 
+
 mock_get_import_definition = MagicMock()
+
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition", mock_get_import_definition)
 @patch("gobtest.data_consistency.data_consistency_test.GOBModel", MagicMock())
@@ -326,7 +329,7 @@ class TestDataConsistencyTest(TestCase):
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
         inst.analyse_db = MagicMock()
-        inst.analyse_db.query.return_value = [['WKT VAL']]
+        inst.analyse_db.query.return_value = iter([['WKT VAL']])
         query_kwargs = {
             'name': 'test_analyse_db_cursor',
             'arraysize': 2000,
@@ -753,8 +756,14 @@ class TestDataConsistencyTest(TestCase):
         inst = DataConsistencyTest('cat', 'col')
         inst.has_states = True
         inst.analyse_db = MagicMock()
-        inst.analyse_db.read.return_value = [{'the': 'row'}]
+        inst.analyse_db.query.return_value = iter([{'the': 'row'}])
         inst.entity_id_field = 'ai die'
+
+        query_kwargs = {
+            'name': 'test_analyse_db_cursor',
+            'arraysize': 2000,
+            'withhold': True
+        }
 
         inst.import_definition = {
             'source': {
@@ -777,7 +786,7 @@ class TestDataConsistencyTest(TestCase):
         }
 
         self.assertEqual([{'the': 'row'}], inst._get_matching_gob_rows(source_row))
-        inst.analyse_db.read.assert_called_with("""\
+        inst.analyse_db.query.assert_called_with("""\
 SELECT
     *
 FROM
@@ -788,14 +797,14 @@ WHERE
     _date_deleted IS NULL AND
     volgnummer = 'SEQNR' AND
     _source_id = 'ID%%''.SEQNR'
-""")
+""", **query_kwargs)
 
         inst.is_merged = True
         # If the dataset is merged with another dataset the sequence number is not guaranteed to match
         # Instead the last known entity is retrieved, independent of the sequence number
 
         inst._get_matching_gob_rows(source_row)
-        inst.analyse_db.read.assert_called_with("""\
+        inst.analyse_db.query.assert_called_with("""\
 SELECT
     *
 FROM
@@ -805,7 +814,7 @@ WHERE
     _application = 'any application' AND
     _date_deleted IS NULL AND
     _source_id LIKE 'ID%%''.%'
-""")
+""", **query_kwargs)
 
     def test_get_source_data(self):
         inst = DataConsistencyTest('cat', 'col')
@@ -849,7 +858,7 @@ WHERE
 
     def test_gob_count(self):
         inst = DataConsistencyTest('cat', 'col')
-        inst._read_from_analyse_db = lambda query: [{'count': 123}]
+        inst._read_from_analyse_db = lambda query: iter([{'count': 123}])
         self.assertEqual(inst._get_gob_count(), 123)
 
     def test_read_from_analyse_db(self):

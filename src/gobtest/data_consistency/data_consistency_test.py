@@ -276,8 +276,8 @@ class DataConsistencyTest:
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
             return None
-        result = self._read_from_analyse_db(f"SELECT ST_AsText('{geo_value}'::geometry)")
-        return result[0][0] if result else None
+        result = next(self._read_from_analyse_db(f"SELECT ST_AsText('{geo_value}'::geometry)"))
+        return result[0] if result else None
 
     def _normalise_wkt(self, wkt_value: str):
         """Removes space after type keyword and before first parenthesis in WKT definition, removes spaces after
@@ -532,8 +532,8 @@ WHERE
         :return:
         """
         query = self._select_from_gob_query(select="count(*)")
-        result = self._read_from_analyse_db(query)
-        return dict(result[0])['count']
+        result = next(self._read_from_analyse_db(query))
+        return dict(result)['count']
 
     def equal_values(self, src_value, gob_value):
         """
@@ -649,9 +649,9 @@ WHERE
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
         query = self._select_from_gob_query(select="*", where=where)
-        result = self.analyse_db.read(query)
+        result = [dict(res) for res in self._read_from_analyse_db(query)]
 
-        return [dict(res) for res in result] if result else None
+        return result if result else None
 
     def _get_source_data(self):
         """Get the source data using a server-side cursor."""
@@ -682,7 +682,7 @@ WHERE
         self.analyse_db = DatastoreFactory.get_datastore(get_datastore_config(ANALYSE_DB))
         self.analyse_db.connect()
 
-    def _read_from_analyse_db(self, query):
+    def _read_from_analyse_db(self, query) -> Optional[Iterator]:
         """
         Read from the analyse db using server-side cursor. Reconnect if any query fails.
         autocommit = True on the connection would also solve the problem
