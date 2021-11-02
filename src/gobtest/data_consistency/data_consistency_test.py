@@ -4,6 +4,7 @@ import re
 import operator
 import datetime
 from functools import reduce
+from typing import Iterator, Optional
 
 from gobcore.utils import ProgressTicker
 from gobcore.exceptions import GOBException
@@ -156,7 +157,7 @@ class DataConsistencyTest:
     def run(self):
         self._connect()
         test_every = 1 / self.SAMPLE_SIZE
-        random_offset = random.randint(0, test_every - 1)
+        random_offset = random.randint(0, int(test_every - 1))
 
         rows = self._get_source_data()
         cnt = 0
@@ -242,7 +243,7 @@ class DataConsistencyTest:
             # Collect id's with counts from merged data, where id is the field that is used to match the two sources
             ids = reduce(lambda x, y: x.update({y[on]: x.get(y[on], 0) + 1}) or x, merge_objects, {})
 
-            expected_cnt = len(merge_ids) + sum([cnt if id not in merge_ids else cnt - 1 for id, cnt in ids.items()])
+            expected_cnt = len(merge_ids) + sum([cnt if id_ not in merge_ids else cnt - 1 for id_, cnt in ids.items()])
 
             return expected_cnt
         else:
@@ -276,10 +277,11 @@ class DataConsistencyTest:
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
             return None
-        result = self._read_from_analyse_db(f"SELECT ST_AsText('{geo_value}'::geometry)")
-        return result[0][0] if result else None
+        result = next(self._read_from_analyse_db(f"SELECT ST_AsText('{geo_value}'::geometry)"))
+        return result[0] if result else None
 
-    def _normalise_wkt(self, wkt_value: str):
+    @staticmethod
+    def _normalise_wkt(wkt_value: str):
         """Removes space after type keyword and before first parenthesis in WKT definition, removes spaces after
         comma's and remove decimals to prevent rounding issues.
 
@@ -295,24 +297,24 @@ class DataConsistencyTest:
         fltval = re.sub(r'(\d+)(\.\d+)', r'\g<1>', comma)
         return fltval
 
-    def _transform_source_value(self, type, value, mapping):
+    def _transform_source_value(self, type_, value, mapping):
         """
         Transform the source value so that it can be compared with the GOB value
 
-        :param type:
+        :param type_:
         :param value:
         :param mapping:
         :return:
         """
         try:
             # Let GOB typesystem handle formatting
-            value = type.from_value(value, **mapping).to_value
+            value = type_.from_value(value, **mapping).to_value
         except GOBTypeException:
             # Stick with the raw source value
             pass
         else:
             # No exception
-            if issubclass(type, GEOType):
+            if issubclass(type_, GEOType):
                 value = self._normalise_wkt(value)
         return value
 
@@ -375,22 +377,23 @@ class DataConsistencyTest:
 
             result[f'{attr_name}_{nested_gob_key}'] = value
 
-    def _unpack_string_list(self, s):
+    @staticmethod
+    def _unpack_string_list(string: str) -> list[str]:
         """
         Unpack a string as a list
 
         Take the separator as being the character that occurs the most in the given string
         from a list a possible separators
 
-        :param s:
+        :param string:
         :return:
         """
         # Count the number of occurences for each possible separator
-        counts = {sep: s.count(sep) for sep in [';', ',', ':']}
+        counts = {sep: string.count(sep) for sep in [';', ',', ':']}
         # Take the separator with the highest count
         separator = max(counts.items(), key=operator.itemgetter(1))[0]
         # Return a list from the string splitted on the separator and each value trimmed
-        return [v.strip() for v in s.split(separator) if v]
+        return [v.strip() for v in string.split(separator) if v]
 
     def _unpack_reference(self, gob_type, attr_name, mapping, source_row, result):
         """
@@ -465,7 +468,7 @@ class DataConsistencyTest:
 
         elif model_attr.get('has_multiple_values'):
             # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
-            json_source_data = self._load_json_source_data(attr_name, source_mapping, source_row)
+            json_source_data = self._load_json_source_data(source_mapping, source_row)
 
             # For multi value JSON values we need to unpack the items to match the format in the analyse database
             for nested_gob_key in model_attr.get('attributes'):
@@ -477,11 +480,11 @@ class DataConsistencyTest:
             # Skip JSON's that are not imported per attribute
             self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non- or empty-JSON")
 
-    def _load_json_source_data(self, attr_name, source_mapping, source_row):
+    @staticmethod
+    def _load_json_source_data(source_mapping: dict, source_row: dict):
         """
         Try to load the json_data since we sometimes receive a string from the source database
 
-        :param attr_name:
         :param source_mapping:
         :param source_row:
         :return:
@@ -532,10 +535,11 @@ WHERE
         :return:
         """
         query = self._select_from_gob_query(select="count(*)")
-        result = self._read_from_analyse_db(query)
-        return dict(result[0])['count']
+        result = next(self._read_from_analyse_db(query))
+        return dict(result)['count']
 
-    def equal_values(self, src_value, gob_value):
+    @staticmethod
+    def equal_values(src_value, gob_value) -> bool:
         """
         Value equality between source and GOB is normally a simple string comparison
 
@@ -649,12 +653,14 @@ WHERE
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
         query = self._select_from_gob_query(select="*", where=where)
-        result = self.analyse_db.read(query)
+        result = [dict(res) for res in self._read_from_analyse_db(query)]
 
-        return [dict(res) for res in result] if result else None
+        return result if result else None
 
     def _get_source_data(self):
-        return self.src_datastore.query("\n".join(self.source.get('query', [])))
+        """Get the source data using a server-side cursor."""
+        qry = '\n'.join(self.source.get('query', []))
+        return self.src_datastore.query(qry, name='test_src_db_cursor', arraysize=2_000, withhold=True)
 
     def _get_merge_data(self):
         """Returns the data from the merge source for this import
@@ -680,9 +686,9 @@ WHERE
         self.analyse_db = DatastoreFactory.get_datastore(get_datastore_config(ANALYSE_DB))
         self.analyse_db.connect()
 
-    def _read_from_analyse_db(self, query):
+    def _read_from_analyse_db(self, query) -> Optional[Iterator]:
         """
-        Read from the analyse db. Reconnect if any query fails.
+        Read from the analyse db using server-side cursor. Reconnect if any query fails.
         autocommit = True on the connection would also solve the problem
         but this logic is independent from the DatastoreFactory implementation
 
@@ -690,7 +696,7 @@ WHERE
         :return:
         """
         try:
-            return self.analyse_db.read(query)
+            return self.analyse_db.query(query, name='test_analyse_db_cursor', arraysize=2_000, withhold=True)
         except GOBException as e:
             print("Query failed", str(e), query)
             # If autocommit = False the connection will be blocked for further queries
