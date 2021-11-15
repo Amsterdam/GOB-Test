@@ -332,7 +332,7 @@ class TestDataConsistencyTest(TestCase):
         inst.analyse_db.query.return_value = iter([['WKT VAL']])
         query_kwargs = {
             'name': 'test_analyse_db_cursor',
-            'arraysize': 2000,
+            'arraysize': inst.BATCH_SIZE,
             'withhold': True
         }
 
@@ -761,7 +761,7 @@ class TestDataConsistencyTest(TestCase):
 
         query_kwargs = {
             'name': 'test_analyse_db_cursor',
-            'arraysize': 2000,
+            'arraysize': inst.BATCH_SIZE,
             'withhold': True
         }
 
@@ -824,7 +824,7 @@ WHERE
         }
         query_kwargs = {
             'name': 'test_src_db_cursor',
-            'arraysize': 2000,
+            'arraysize': inst.BATCH_SIZE,
             'withhold': True
         }
 

@@ -40,6 +40,8 @@ class DataConsistencyTest:
     # How many rows of total rows to check
     SAMPLE_SIZE = 0.001
 
+    BATCH_SIZE = 8_000
+
     default_ignore_columns = [
         'ref',
         FIELD.SOURCE,
@@ -660,7 +662,7 @@ WHERE
     def _get_source_data(self):
         """Get the source data using a server-side cursor."""
         qry = '\n'.join(self.source.get('query', []))
-        return self.src_datastore.query(qry, name='test_src_db_cursor', arraysize=2_000, withhold=True)
+        return self.src_datastore.query(qry, name='test_src_db_cursor', arraysize=self.BATCH_SIZE, withhold=True)
 
     def _get_merge_data(self):
         """Returns the data from the merge source for this import
@@ -696,7 +698,12 @@ WHERE
         :return:
         """
         try:
-            return self.analyse_db.query(query, name='test_analyse_db_cursor', arraysize=2_000, withhold=True)
+            return self.analyse_db.query(
+                query,
+                name='test_analyse_db_cursor',
+                arraysize=self.BATCH_SIZE,
+                withhold=True
+            )
         except GOBException as e:
             print("Query failed", str(e), query)
             # If autocommit = False the connection will be blocked for further queries
