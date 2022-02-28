@@ -1,2 +1,2 @@
--e git+https://github.com/Amsterdam/GOB-Config.git@v0.4.15e#egg=gobconfig
--e git+https://github.com/Amsterdam/GOB-Core.git@v0.17.13c#egg=gobcore
+-e git+https://github.com/Amsterdam/GOB-Config.git@v0.4.15f#egg=gobconfig
+-e git+https://github.com/Amsterdam/GOB-Core.git@v0.17.13f#egg=gobcore
