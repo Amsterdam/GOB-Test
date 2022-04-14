@@ -1,9 +1,11 @@
-version: '3.0'
+version: '3.8'
 
 services:
 
   gobtest:
-    build: src
+    build:
+      context: src
+      target: development
     container_name: gobtest
     environment:
       MESSAGE_BROKER_ADDRESS: rabbitmq
@@ -17,6 +19,10 @@ services:
       ANALYSE_DATABASE: gob_analyse
     volumes:
       - gob-volume:/app/shared
+      - ./src/gobtest:/app/gobtest
+      - ./src/tests:/app/tests
+      - ${GOB_CORE_DIR-../GOB-Core}:/app/GOB-Core
+      - ${GOB_CONFIG_DIR-../GOB-Config}:/app/GOB-Config
 
 networks:
   default:
