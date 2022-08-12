@@ -26,3 +26,19 @@ RUN rm -rf /opt/wheelhouse
 COPY gobtest gobtest
 
 CMD ["python", "-m", "gobtest"]
+
+
+# Test.
+FROM application as test
+
+# Remove gobcore tests
+RUN rm -rf /app/src/gobcore/tests
+
+# Copy test module
+COPY tests tests
+
+# Copy tests
+COPY test.sh .flake8 ./
+
+# Copy jenkins files
+COPY .jenkins /.jenkins
