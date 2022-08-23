@@ -20,8 +20,8 @@ services:
 
 networks:
   default:
-    external:
-      name: gob-network
+    name: gob-network
+    external: true
 
 volumes:
   gob-volume:
