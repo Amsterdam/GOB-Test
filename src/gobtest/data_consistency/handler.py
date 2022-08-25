@@ -38,6 +38,7 @@ def data_consistency_test_handler(msg):
     msg['header']['entity'] = msg['header'].get('entity', collection)
 
     logger.configure(msg, 'Data consistency test')
+    logger.add_message_broker_handler()
 
     assert all([catalog, collection]), "Expecting header attributes 'catalogue' and 'collection'"
     id = f"{catalog} {collection} {application or ''}"
