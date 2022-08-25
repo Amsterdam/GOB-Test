@@ -21,6 +21,8 @@ def end_to_end_test_handler(msg):
     header['process_id'] = header.get('process_id', f"{start_timestamp}.e2e_test")
 
     logger.configure(msg, 'E2E Test')
+    logger.add_message_broker_handler()
+
     logger.info("Clear any previous test data")
 
     e2etest = E2ETest(header['process_id'])
@@ -39,6 +41,8 @@ def end_to_end_test_handler(msg):
 
 def end_to_end_execute_workflow_handler(msg):
     logger.configure(msg, 'E2E Test')
+    logger.add_message_broker_handler()
+
     workflow_to_execute = msg['header'].get('execute')
     workflow_process_id = msg['header'].get('execute_process_id')
     process_id = msg['header'].get('process_id')
@@ -58,6 +62,8 @@ def end_to_end_execute_workflow_handler(msg):
 
 def end_to_end_wait_handler(msg):
     logger.configure(msg, 'E2E Test')
+    logger.add_message_broker_handler()
+
     process_id = msg['header'].get('process_id')
     wait_for_process_id = msg['header'].get('wait_for_process_id')
     seconds = msg['header'].get('seconds')
@@ -77,6 +83,7 @@ def end_to_end_wait_handler(msg):
 
 def end_to_end_check_handler(msg):
     logger.configure(msg, 'E2E Test')
+    logger.add_message_broker_handler()
 
     endpoint = msg['header'].get('endpoint')
     expect = msg['header'].get('expect')
