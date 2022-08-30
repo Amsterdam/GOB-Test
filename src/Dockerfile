@@ -25,20 +25,22 @@ RUN rm -rf /opt/wheelhouse
 # Copy gobtest module
 COPY gobtest gobtest
 
+USER datapunt
 CMD ["python", "-m", "gobtest"]
 
 
 # Test.
 FROM application as test
+USER root
 
-# Remove gobcore tests
+# Remove gobcore tests.
 RUN rm -rf /app/src/gobcore/tests
 
-# Copy test module
+# Copy test module and tests.
+COPY test.sh .flake8 pytest.ini ./
 COPY tests tests
 
-# Copy tests
-COPY test.sh .flake8 ./
-
-# Copy jenkins files
+# Copy Jenkins files.
 COPY .jenkins /.jenkins
+
+USER datapunt
