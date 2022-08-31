@@ -12,5 +12,5 @@ flake8
 echo "Running unit tests"
 coverage run --source=./gobtest -m pytest tests/
 
-echo "Running coverage tests"
+echo "Coverage report"
 coverage report --show-missing --fail-under=100
