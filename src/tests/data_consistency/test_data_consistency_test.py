@@ -328,16 +328,16 @@ class TestDataConsistencyTest(TestCase):
 
     def test_geometry_to_wkt(self):
         inst = DataConsistencyTest('cat', 'col')
-        inst.analyse_db = MagicMock()
-        inst.analyse_db.query.return_value = iter([['WKT VAL']])
+        inst.gob_db = MagicMock()
+        inst.gob_db.query.return_value = iter([['WKT VAL']])
         query_kwargs = {
-            'name': 'test_analyse_db_cursor',
+            'name': 'test_gob_db_cursor',
             'arraysize': inst.BATCH_SIZE,
             'withhold': True
         }
 
         self.assertEqual('WKT VAL', inst._geometry_to_wkt('geoval'))
-        inst.analyse_db.query.assert_called_with("SELECT ST_AsText('geoval'::geometry)", **query_kwargs)
+        inst.gob_db.query.assert_called_with("SELECT ST_AsText('geoval'::geometry)", **query_kwargs)
 
         self.assertIsNone(inst._geometry_to_wkt(None))
 
@@ -658,20 +658,51 @@ class TestDataConsistencyTest(TestCase):
         inst = DataConsistencyTest('cat', 'col')
         inst._geometry_to_wkt = lambda x: 'wkt(' + x + ')'
         inst._normalise_wkt = lambda x: 'normalised(' + x + ')'
+        inst.import_definition['gob_mapping'] = {
+            'geofield': None,
+            'jsonfield': {
+                'source_mapping': {
+                    'a': None,
+                    'b': None,
+                }
+            },
+            'reffield': {
+                'source_mapping': {
+                    'bronwaarde': None,
+                }
+            }
+        }
         inst.collection = {
             'all_fields': {
                 'geofield': {
-                    'type': 'GOB.Geo.Blah',
+                    'type': 'GOB.Geo.Point',
+                },
+                'jsonfield': {
+                    'type': 'GOB.JSON',
+                },
+                'reffield': {
+                    'type': 'GOB.Reference',
                 }
             }
         }
         gob_row = {
             'geofield': 'geovalue',
             '_date_deleted': 'ignored',
+            'jsonfield': {
+                'a': 'The value for A',
+                'b': 'B value'
+            },
+            'reffield': {
+                'bronwaarde': 'the zorz value'
+            }
         }
 
         self.assertEqual({
-            'geofield': 'normalised(wkt(geovalue))'
+            'geofield': 'normalised(wkt(geovalue))',
+            'jsonfield_a': 'The value for A',
+            'jsonfield_b': 'B value',
+            'reffield_bronwaarde': 'the zorz value',
+
         }, inst._transform_gob_row(gob_row))
 
     @patch("gobtest.data_consistency.data_consistency_test.logger")
@@ -755,12 +786,12 @@ class TestDataConsistencyTest(TestCase):
     def test_get_matching_gob_row(self):
         inst = DataConsistencyTest('cat', 'col')
         inst.has_states = True
-        inst.analyse_db = MagicMock()
-        inst.analyse_db.query.return_value = iter([{'the': 'row'}])
+        inst.gob_db = MagicMock()
+        inst.gob_db.query.return_value = iter([{'the': 'row'}])
         inst.entity_id_field = 'ai die'
 
         query_kwargs = {
-            'name': 'test_analyse_db_cursor',
+            'name': 'test_gob_db_cursor',
             'arraysize': inst.BATCH_SIZE,
             'withhold': True
         }
@@ -786,11 +817,11 @@ class TestDataConsistencyTest(TestCase):
         }
 
         self.assertEqual([{'the': 'row'}], inst._get_matching_gob_rows(source_row))
-        inst.analyse_db.query.assert_called_with("""\
+        inst.gob_db.query.assert_called_with("""\
 SELECT
     *
 FROM
-    cat.col
+    cat_col
 WHERE
     _source = 'any source' AND
     _application = 'any application' AND
@@ -804,11 +835,11 @@ WHERE
         # Instead the last known entity is retrieved, independent of the sequence number
 
         inst._get_matching_gob_rows(source_row)
-        inst.analyse_db.query.assert_called_with("""\
+        inst.gob_db.query.assert_called_with("""\
 SELECT
     *
 FROM
-    cat.col
+    cat_col
 WHERE
     _source = 'any source' AND
     _application = 'any application' AND
@@ -858,16 +889,16 @@ WHERE
 
     def test_gob_count(self):
         inst = DataConsistencyTest('cat', 'col')
-        inst._read_from_analyse_db = lambda query: iter([{'count': 123}])
+        inst._read_from_gob_db = lambda query: iter([{'count': 123}])
         self.assertEqual(inst._get_gob_count(), 123)
 
     def test_read_from_analyse_db(self):
         inst = DataConsistencyTest('cat', 'col')
-        inst.analyse_db = MagicMock()
-        inst.analyse_db.query.side_effect = lambda query, name, arraysize, withhold: "any result"
-        self.assertEqual(inst._read_from_analyse_db("any query"), "any result")
-        inst.analyse_db.query.side_effect = GOBException("any GOB exception")
-        self.assertEqual(inst._read_from_analyse_db("any error query"), None)
+        inst.gob_db = MagicMock()
+        inst.gob_db.query.side_effect = lambda query, name, arraysize, withhold: "any result"
+        self.assertEqual(inst._read_from_gob_db("any query"), "any result")
+        inst.gob_db.query.side_effect = GOBException("any GOB exception")
+        self.assertEqual(inst._read_from_gob_db("any error query"), None)
 
     @patch("gobtest.data_consistency.data_consistency_test.DatastoreFactory")
     @patch("gobtest.data_consistency.data_consistency_test.get_datastore_config", lambda x: x + '_CONFIG')
@@ -880,6 +911,6 @@ WHERE
         mock_factory.get_datastore.assert_has_calls([
             call('app_CONFIG', {}),
             call().connect(),
-            call('GOBAnalyse_CONFIG'),
+            call('GOBDatabase_CONFIG'),
             call().connect(),
         ])
