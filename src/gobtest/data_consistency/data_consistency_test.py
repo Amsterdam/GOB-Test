@@ -509,8 +509,12 @@ class DataConsistencyTest:
             type_ = get_gob_type_from_info(attr)
 
             if issubclass(type_, JSON):
+                gob_value = gob_row[attr_name]
                 for key in mapping['source_mapping'].keys():
-                    result[f"{attr_name}_{key}"] = gob_row[attr_name].get(key)
+                    if isinstance(gob_value, dict):
+                        result[f"{attr_name}_{key}"] = gob_value.get(key)
+                    elif isinstance(gob_value, list):
+                        result[f"{attr_name}_{key}"] = [item.get(key) for item in gob_value]
             else:
                 result[attr_name] = gob_row.get(attr_name)
 
@@ -566,11 +570,9 @@ WHERE
         :return:
         """
         if isinstance(src_value, list):
-            # Skip any None values from the source list
-            src_value = ','.join(sorted([str(v).strip() for v in src_value if v is not None]))
-            # Rebuild the GOB list from the string, skipping empty values
-            gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v])) \
-                if isinstance(gob_value, str) else gob_value
+            src_value = sorted([str(v).strip() for v in src_value if v is not None])
+            gob_value = sorted([str(v).strip() for v in gob_value if v is not None])
+
             return src_value == gob_value
         else:
             # Compare the two values as string without whitespace, case-insensitive

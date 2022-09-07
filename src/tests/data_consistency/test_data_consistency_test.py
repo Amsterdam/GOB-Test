@@ -630,28 +630,29 @@ class TestDataConsistencyTest(TestCase):
         inst = DataConsistencyTest('cat', 'col')
         for value in 1, True, 2.5, "any string":
             self.assertTrue(inst.equal_values(value, str(value)))
-        self.assertTrue(inst.equal_values([], "[]"))
-        self.assertTrue(inst.equal_values([None, None], "[]"))
-        self.assertTrue(inst.equal_values([None, None], "[,,]"))
-        self.assertTrue(inst.equal_values([1,2], "[1,2]"))
-        self.assertTrue(inst.equal_values([1,2,3], "[1, 3, 2]")) # sorted compare
-        self.assertFalse(inst.equal_values([1,2], "[1, 2, 3]"))
-        self.assertFalse(inst.equal_values([1,2,3], "[1, 2]"))
-        self.assertFalse(inst.equal_values([1,2], "[1, False]"))
-        self.assertTrue(inst.equal_values([1,False], "[1, False]"))
-        self.assertTrue(inst.equal_values([1,2.5], "[1, 2.5]"))
-        self.assertTrue(inst.equal_values([0,2.5], "[0, 2.5]"))
-        self.assertFalse(inst.equal_values([], None))
+        self.assertTrue(inst.equal_values([], []))
+        self.assertTrue(inst.equal_values([1, 2], [2, 1]))
+        self.assertTrue(inst.equal_values(["1", 2], ["2", 1]))
+        self.assertTrue(inst.equal_values([1, 2, 3], [2, 1, 3]))
+        self.assertTrue(inst.equal_values([1, 2], [1, None, 2]))
+        self.assertTrue(inst.equal_values([None, 1, 2], [1, None, 2]))
+        self.assertTrue(inst.equal_values([None, 1, 2], [1, None, 2, None]))
+        self.assertTrue(inst.equal_values([None, None, 1, 2], [1, None, 2]))
+        self.assertFalse(inst.equal_values([1], [1, 1]))
+        self.assertFalse(inst.equal_values([1, 1], [1]))
+        self.assertFalse(inst.equal_values([1, 2], [2, 1, 1]))
+        self.assertFalse(inst.equal_values([1, 2], [2, 1, 1]))
+
         self.assertFalse(inst.equal_values("aap noot mies", "aap noot"))
         self.assertFalse(inst.equal_values("aap noot", "aap noot mies"))
         self.assertTrue(inst.equal_values("  Aap \t nOOt \n", "aap noot"))
         # Date comparison should skip any 00:00:00 time
-        self.assertTrue(inst.equal_values("2020-06-20", datetime.date(2020,6,20)))
-        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.date(2020,6,20)))
+        self.assertTrue(inst.equal_values("2020-06-20", datetime.date(2020, 6, 20)))
+        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.date(2020, 6, 20)))
         # But only for dates
-        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.datetime(2020,6,20,0,0,0)))
+        self.assertTrue(inst.equal_values("2020-06-20 00:00:00", datetime.datetime(2020, 6, 20, 0, 0, 0)))
         # But not any other time
-        self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.date(2020,6,20)))
+        self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.date(2020, 6, 20)))
         self.assertFalse(inst.equal_values("2020-06-20 00:00:01", datetime.datetime(2020,6,20,0,0,2)))
 
     def test_transform_gob_row(self):
@@ -670,6 +671,12 @@ class TestDataConsistencyTest(TestCase):
                 'source_mapping': {
                     'bronwaarde': None,
                 }
+            },
+            'listjsonfield': {
+                'source_mapping': {
+                    'a': None,
+                    'b': None,
+                }
             }
         }
         inst.collection = {
@@ -682,7 +689,10 @@ class TestDataConsistencyTest(TestCase):
                 },
                 'reffield': {
                     'type': 'GOB.Reference',
-                }
+                },
+                'listjsonfield': {
+                    'type': 'GOB.JSON',
+                },
             }
         }
         gob_row = {
@@ -694,7 +704,8 @@ class TestDataConsistencyTest(TestCase):
             },
             'reffield': {
                 'bronwaarde': 'the zorz value'
-            }
+            },
+            'listjsonfield': [{'a': 'first A', 'b': 'first B'}, {'a': 'second A', 'b': 'second B'}]
         }
 
         self.assertEqual({
@@ -702,6 +713,8 @@ class TestDataConsistencyTest(TestCase):
             'jsonfield_a': 'The value for A',
             'jsonfield_b': 'B value',
             'reffield_bronwaarde': 'the zorz value',
+            'listjsonfield_a': ['first A', 'second A'],
+            'listjsonfield_b': ['first B', 'second B'],
 
         }, inst._transform_gob_row(gob_row))
 
