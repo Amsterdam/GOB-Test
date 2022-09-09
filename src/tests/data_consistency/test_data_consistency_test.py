@@ -665,6 +665,7 @@ class TestDataConsistencyTest(TestCase):
                 'source_mapping': {
                     'a': None,
                     'b': None,
+                    'format': None,
                 }
             },
             'reffield': {
@@ -676,6 +677,7 @@ class TestDataConsistencyTest(TestCase):
                 'source_mapping': {
                     'a': None,
                     'b': None,
+                    'format': None,
                 }
             }
         }

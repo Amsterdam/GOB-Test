@@ -511,6 +511,8 @@ class DataConsistencyTest:
             if issubclass(type_, JSON):
                 gob_value = gob_row[attr_name]
                 for key in mapping['source_mapping'].keys():
+                    if key == "format":
+                        continue
                     if isinstance(gob_value, dict):
                         result[f"{attr_name}_{key}"] = gob_value.get(key)
                     elif isinstance(gob_value, list):
