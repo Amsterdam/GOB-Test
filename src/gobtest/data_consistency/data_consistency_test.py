@@ -496,10 +496,14 @@ class DataConsistencyTest:
         except (TypeError, json.decoder.JSONDecodeError):
             return source_row.get(source_mapping)
 
-    def _transform_gob_row(self, gob_row: dict):
-
+    def _normalise_geometries(self, gob_row: dict):
+        normalised = {}
         for geo_key in [k for k, v in self.collection['all_fields'].items() if v['type'].startswith('GOB.Geo')]:
-            gob_row[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
+            normalised[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
+        return {**gob_row, **normalised}
+
+    def _transform_gob_row(self, gob_row: dict):
+        row = self._normalise_geometries(gob_row)
 
         attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
         result = {}
@@ -509,7 +513,7 @@ class DataConsistencyTest:
             type_ = get_gob_type_from_info(attr)
 
             if issubclass(type_, JSON):
-                gob_value = gob_row[attr_name]
+                gob_value = row[attr_name]
                 for key in mapping['source_mapping'].keys():
                     if key == "format":
                         continue
@@ -518,7 +522,7 @@ class DataConsistencyTest:
                     elif isinstance(gob_value, list):
                         result[f"{attr_name}_{key}"] = [item.get(key) for item in gob_value]
             else:
-                result[attr_name] = gob_row.get(attr_name)
+                result[attr_name] = row.get(attr_name)
 
         return result
 
