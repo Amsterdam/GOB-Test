@@ -28,6 +28,16 @@ COPY gobtest gobtest
 USER datapunt
 CMD ["python", "-m", "gobtest"]
 
+# Development.
+FROM application as development
+USER root
+
+RUN git clone --depth=1 https://github.com/Amsterdam/GOB-Core.git
+RUN LIBGDAL_VERSION=$(gdal-config --version) pip install -e /app/GOB-Core
+RUN git clone --depth=1 https://github.com/Amsterdam/GOB-Config.git
+RUN pip install -e /app/GOB-Config
+USER datapunt
+
 
 # Test.
 FROM application as test
