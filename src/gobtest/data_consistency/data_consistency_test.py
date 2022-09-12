@@ -20,7 +20,7 @@ from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.exceptions import GOBTypeException
 from gobcore.logging.logger import logger
 
-ANALYSE_DB = 'GOBAnalyse'
+GOB_DB = 'GOBDatabase'
 
 
 class NotImplementedCatalogError(GOBException):
@@ -279,7 +279,7 @@ class DataConsistencyTest:
     def _geometry_to_wkt(self, geo_value: str):
         if geo_value is None:
             return None
-        result = next(self._read_from_analyse_db(f"SELECT ST_AsText('{geo_value}'::geometry)"))
+        result = next(self._read_from_gob_db(f"SELECT ST_AsText('{geo_value}'::geometry)"))
         return result[0] if result else None
 
     @staticmethod
@@ -321,7 +321,7 @@ class DataConsistencyTest:
         return value
 
     def _transform_source_row(self, source_row: dict):
-        """Transforms rows from source database to the format the row should appear in the analyse database, based on
+        """Transforms rows from source database to the format the row should appear in the gob database, based on
         the GOBModel and import definition mapping.
 
         :param source_row:
@@ -472,7 +472,7 @@ class DataConsistencyTest:
             # The source data can sometimes be received as a string (Oracle json_arrayagg returns a string)
             json_source_data = self._load_json_source_data(source_mapping, source_row)
 
-            # For multi value JSON values we need to unpack the items to match the format in the analyse database
+            # For multi value JSON values we need to unpack the items to match the format in the gob database
             for nested_gob_key in model_attr.get('attributes'):
                 dst_key = f'{attr_name}_{nested_gob_key}'
 
@@ -496,12 +496,35 @@ class DataConsistencyTest:
         except (TypeError, json.decoder.JSONDecodeError):
             return source_row.get(source_mapping)
 
-    def _transform_gob_row(self, gob_row: dict):
-
+    def _normalise_geometries(self, gob_row: dict):
+        normalised = {}
         for geo_key in [k for k, v in self.collection['all_fields'].items() if v['type'].startswith('GOB.Geo')]:
-            gob_row[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
+            normalised[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
+        return {**gob_row, **normalised}
 
-        return {k: v for k, v in gob_row.items() if k not in self.ignore_columns}
+    def _transform_gob_row(self, gob_row: dict):
+        row = self._normalise_geometries(gob_row)
+
+        attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
+        result = {}
+
+        for attr_name, attr in attributes.items():
+            mapping = self.import_definition['gob_mapping'].get(attr_name)
+            type_ = get_gob_type_from_info(attr)
+
+            if issubclass(type_, JSON):
+                gob_value = row[attr_name]
+                for key in mapping['source_mapping'].keys():
+                    if key == "format":
+                        continue
+                    if isinstance(gob_value, dict):
+                        result[f"{attr_name}_{key}"] = gob_value.get(key)
+                    elif isinstance(gob_value, list):
+                        result[f"{attr_name}_{key}"] = [item.get(key) for item in gob_value]
+            else:
+                result[attr_name] = row.get(attr_name)
+
+        return result
 
     def _select_from_gob_query(self, select, where=None):
         """
@@ -525,7 +548,7 @@ class DataConsistencyTest:
 SELECT
     {select}
 FROM
-    {self.catalog_name}.{self.collection_name}
+    {self.catalog_name}_{self.collection_name}
 WHERE
     {where}
 """
@@ -537,7 +560,7 @@ WHERE
         :return:
         """
         query = self._select_from_gob_query(select="count(*)")
-        result = next(self._read_from_analyse_db(query))
+        result = next(self._read_from_gob_db(query))
         return dict(result)['count']
 
     @staticmethod
@@ -553,11 +576,9 @@ WHERE
         :return:
         """
         if isinstance(src_value, list):
-            # Skip any None values from the source list
-            src_value = ','.join(sorted([str(v).strip() for v in src_value if v is not None]))
-            # Rebuild the GOB list from the string, skipping empty values
-            gob_value = ','.join(sorted([str(v).strip() for v in gob_value[1:-1].split(',') if v])) \
-                if isinstance(gob_value, str) else gob_value
+            src_value = sorted([str(v).strip() for v in src_value if v is not None])
+            gob_value = sorted([str(v).strip() for v in gob_value if v is not None])
+
             return src_value == gob_value
         else:
             # Compare the two values as string without whitespace, case-insensitive
@@ -655,7 +676,7 @@ WHERE
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
         query = self._select_from_gob_query(select="*", where=where)
-        result = [dict(res) for res in self._read_from_analyse_db(query)]
+        result = [dict(res) for res in self._read_from_gob_db(query)]
 
         return result if result else None
 
@@ -685,12 +706,12 @@ WHERE
         self.src_datastore = DatastoreFactory.get_datastore(datastore_config, self.source.get('read_config', {}))
         self.src_datastore.connect()
 
-        self.analyse_db = DatastoreFactory.get_datastore(get_datastore_config(ANALYSE_DB))
-        self.analyse_db.connect()
+        self.gob_db = DatastoreFactory.get_datastore(get_datastore_config(GOB_DB))
+        self.gob_db.connect()
 
-    def _read_from_analyse_db(self, query) -> Optional[Iterator]:
+    def _read_from_gob_db(self, query) -> Optional[Iterator]:
         """
-        Read from the analyse db using server-side cursor. Reconnect if any query fails.
+        Read from the gob db using server-side cursor. Reconnect if any query fails.
         autocommit = True on the connection would also solve the problem
         but this logic is independent from the DatastoreFactory implementation
 
@@ -698,9 +719,9 @@ WHERE
         :return:
         """
         try:
-            return self.analyse_db.query(
+            return self.gob_db.query(
                 query,
-                name='test_analyse_db_cursor',
+                name='test_gob_db_cursor',
                 arraysize=self.BATCH_SIZE,
                 withhold=True
             )
@@ -708,5 +729,5 @@ WHERE
             print("Query failed", str(e), query)
             # If autocommit = False the connection will be blocked for further queries
             # Reconnect explicitly to prevent subsequent SQL errors
-            self.analyse_db.connect()
+            self.gob_db.connect()
             return None
