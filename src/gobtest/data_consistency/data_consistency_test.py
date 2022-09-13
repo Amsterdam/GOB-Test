@@ -503,6 +503,7 @@ class DataConsistencyTest:
         return {**gob_row, **normalised}
 
     def _transform_gob_row(self, gob_row: dict):
+        ignore_source_mapping_keys = ["format", FIELD.START_VALIDITY, FIELD.END_VALIDITY]
         row = self._normalise_geometries(gob_row)
 
         attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
@@ -515,7 +516,7 @@ class DataConsistencyTest:
             if issubclass(type_, JSON):
                 gob_value = row[attr_name]
                 for key in mapping['source_mapping'].keys():
-                    if key == "format":
+                    if key in ignore_source_mapping_keys:
                         continue
                     if isinstance(gob_value, dict):
                         result[f"{attr_name}_{key}"] = gob_value.get(key)
