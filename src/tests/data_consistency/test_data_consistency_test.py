@@ -666,11 +666,16 @@ class TestDataConsistencyTest(TestCase):
                     'a': None,
                     'b': None,
                     'format': None,
+                    'begin_geldigheid': None,
+                    'eind_geldigheid': None,
                 }
             },
             'reffield': {
                 'source_mapping': {
                     'bronwaarde': None,
+                    'format': None,
+                    'begin_geldigheid': None,
+                    'eind_geldigheid': None,
                 }
             },
             'listjsonfield': {
@@ -678,6 +683,8 @@ class TestDataConsistencyTest(TestCase):
                     'a': None,
                     'b': None,
                     'format': None,
+                    'begin_geldigheid': None,
+                    'eind_geldigheid': None,
                 }
             }
         }
