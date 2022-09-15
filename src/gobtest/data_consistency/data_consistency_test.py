@@ -4,7 +4,7 @@ import re
 import operator
 import datetime
 from functools import reduce
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from gobcore.utils import ProgressTicker
 from gobcore.exceptions import GOBException
@@ -476,11 +476,15 @@ class DataConsistencyTest:
             for nested_gob_key in model_attr.get('attributes'):
                 dst_key = f'{attr_name}_{nested_gob_key}'
 
-                src_result = [obj[nested_gob_key] for obj in json_source_data] if json_source_data else None
+                src_result = self._extract_attr_from_dict_list(nested_gob_key,
+                                                               json_source_data) if json_source_data else None
                 result[dst_key] = src_result
         else:
             # Skip JSON's that are not imported per attribute
             self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non- or empty-JSON")
+
+    def _extract_attr_from_dict_list(self, key: str, dictlist: list[dict]) -> list:
+        return [obj[key] for obj in dictlist]
 
     @staticmethod
     def _load_json_source_data(source_mapping: dict, source_row: dict):
@@ -502,6 +506,14 @@ class DataConsistencyTest:
             normalised[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
         return {**gob_row, **normalised}
 
+    def _unpack_gob_json_value(self, attr_name: str, gob_value: Union[list, dict, None], keys: list[str]) -> dict:
+        if gob_value is None:
+            return {f"{attr_name}_{k}": None for k in keys}
+        elif isinstance(gob_value, list):
+            return {f"{attr_name}_{k}": self._extract_attr_from_dict_list(k, gob_value) for k in keys}
+        else:
+            return {f"{attr_name}_{k}": gob_value.get(k) for k in keys}
+
     def _transform_gob_row(self, gob_row: dict):
         ignore_source_mapping_keys = ["format", FIELD.START_VALIDITY, FIELD.END_VALIDITY]
         row = self._normalise_geometries(gob_row)
@@ -510,20 +522,21 @@ class DataConsistencyTest:
         result = {}
 
         for attr_name, attr in attributes.items():
-            mapping = self.import_definition['gob_mapping'].get(attr_name)
             type_ = get_gob_type_from_info(attr)
+            gob_value = row.get(attr_name)
 
-            if issubclass(type_, JSON):
-                gob_value = row[attr_name]
-                for key in mapping['source_mapping'].keys():
-                    if key in ignore_source_mapping_keys:
-                        continue
-                    if isinstance(gob_value, dict):
-                        result[f"{attr_name}_{key}"] = gob_value.get(key)
-                    elif isinstance(gob_value, list):
-                        result[f"{attr_name}_{key}"] = [item.get(key) for item in gob_value]
+            if issubclass(type_, Reference):
+                result |= self._unpack_gob_json_value(attr_name, gob_value, [FIELD.SOURCE_VALUE])
+            elif issubclass(type_, JSON):
+                mapping = self.import_definition['gob_mapping'].get(attr_name)
+                if isinstance(mapping['source_mapping'], dict):
+                    keys = [k for k in mapping['source_mapping'].keys() if k not in ignore_source_mapping_keys]
+                else:
+                    model_attr = self.collection['all_fields'].get(attr_name)
+                    keys = model_attr.get('attributes').keys()
+                result |= self._unpack_gob_json_value(attr_name, gob_value, keys)
             else:
-                result[attr_name] = row.get(attr_name)
+                result[attr_name] = gob_value
 
         return result
 

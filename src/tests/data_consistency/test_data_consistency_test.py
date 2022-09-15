@@ -686,6 +686,15 @@ class TestDataConsistencyTest(TestCase):
                     'begin_geldigheid': None,
                     'eind_geldigheid': None,
                 }
+            },
+            'jsonfield_nodictmapping': {
+                'source_mapping': 'someval'
+            },
+            'jsonfield_withnogobvalue': {
+                'source_mapping': {
+                    'f': None,
+                    'g': None,
+                }
             }
         }
         inst.collection = {
@@ -702,6 +711,16 @@ class TestDataConsistencyTest(TestCase):
                 'listjsonfield': {
                     'type': 'GOB.JSON',
                 },
+                'jsonfield_nodictmapping': {
+                    'type': 'GOB.JSON',
+                    # Because the source mapping is not a dict, the attributes defined in the model (here) are used
+                    'attributes': {
+                        'c': None,
+                    }
+                },
+                'jsonfield_withnogobvalue': {
+                    'type': 'GOB.JSON',
+                }
             }
         }
         gob_row = {
@@ -714,7 +733,9 @@ class TestDataConsistencyTest(TestCase):
             'reffield': {
                 'bronwaarde': 'the zorz value'
             },
-            'listjsonfield': [{'a': 'first A', 'b': 'first B'}, {'a': 'second A', 'b': 'second B'}]
+            'listjsonfield': [{'a': 'first A', 'b': 'first B'}, {'a': 'second A', 'b': 'second B'}],
+            'jsonfield_nodictmapping': [{'c': 'first C', 'd': 'first D'}, {'c': 'second C', 'd': 'second D'}],
+            'jsonfield_withnogobvalue': None,
         }
 
         self.assertEqual({
@@ -724,7 +745,9 @@ class TestDataConsistencyTest(TestCase):
             'reffield_bronwaarde': 'the zorz value',
             'listjsonfield_a': ['first A', 'second A'],
             'listjsonfield_b': ['first B', 'second B'],
-
+            'jsonfield_nodictmapping_c': ['first C', 'second C'],
+            'jsonfield_withnogobvalue_f': None,
+            'jsonfield_withnogobvalue_g': None,
         }, inst._transform_gob_row(gob_row))
 
     @patch("gobtest.data_consistency.data_consistency_test.logger")
