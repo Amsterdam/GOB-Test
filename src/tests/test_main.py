@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from gobtest.__main__ import SERVICEDEFINITION, DATA_CONSISTENCY_TEST, on_dump_listener
 

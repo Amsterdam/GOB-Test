@@ -14,6 +14,7 @@ from gobcore.message_broker.config import (
 )
 from gobcore.message_broker.messagedriven_service import messagedriven_service
 from gobcore.message_broker.notifications import get_notification, listen_to_notifications
+from gobcore.message_broker.typing import ServiceDefinition
 from gobcore.workflow.start_workflow import start_workflow
 
 from gobtest.e2e.handler import (
@@ -43,7 +44,7 @@ def on_dump_listener(msg):
         start_workflow(workflow, arguments)
 
 
-SERVICEDEFINITION = {
+SERVICEDEFINITION: ServiceDefinition = {
     'e2e_test': {
         'queue': END_TO_END_TEST_QUEUE,
         'handler': end_to_end_test_handler,
