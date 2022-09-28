@@ -6,12 +6,12 @@ import datetime
 from functools import reduce
 from typing import Iterator, Optional, Union
 
+from gobconfig.import_.import_config import get_import_definition, get_import_definition_by_filename
+from gobconfig.datastore.config import get_datastore_config
+
 from gobcore.utils import ProgressTicker
 from gobcore.exceptions import GOBException
-from gobconfig.import_.import_config import get_import_definition, get_import_definition_by_filename
 from gobcore.datastore.factory import DatastoreFactory
-from gobconfig.datastore.config import get_datastore_config
-from gobcore.model import GOBModel
 from gobcore.model.metadata import FIELD
 from gobcore.typesystem import get_gob_type_from_info
 from gobcore.typesystem.gob_types import Reference, JSON, IncompleteDate
@@ -19,6 +19,8 @@ from gobcore.typesystem.gob_secure_types import Secure
 from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.exceptions import GOBTypeException
 from gobcore.logging.logger import logger
+
+from gobtest import gob_model
 
 GOB_DB = 'GOBDatabase'
 
@@ -78,7 +80,7 @@ class DataConsistencyTest:
         self.catalog_name = catalog_name
         self.collection_name = collection_name
         self.application = application
-        self.collection = GOBModel().get_collection(catalog_name, collection_name)
+        self.collection = gob_model[catalog_name]['collections'][collection_name]
         self.entity_id_field = self.source['entity_id']
         self.has_states = self.collection.get('has_states', False)
         self.gob_key_errors = {}
@@ -113,7 +115,7 @@ class DataConsistencyTest:
         and are therefor skipped in the comparison
         :return:
         """
-        for attribute, type_info in self.collection['attributes'].items():
+        for attribute in self.collection['attributes']:
             mapping = self.import_definition['gob_mapping'].get(attribute)
             if mapping and mapping.get('filters'):
                 # Ignore columns whose values are modified (eg to uppercase, ...)
@@ -245,11 +247,11 @@ class DataConsistencyTest:
             # Collect id's with counts from merged data, where id is the field that is used to match the two sources
             ids = reduce(lambda x, y: x.update({y[on]: x.get(y[on], 0) + 1}) or x, merge_objects, {})
 
-            expected_cnt = len(merge_ids) + sum([cnt if id_ not in merge_ids else cnt - 1 for id_, cnt in ids.items()])
+            expected_cnt = len(merge_ids) + sum(
+                cnt if id_ not in merge_ids else cnt - 1 for id_, cnt in ids.items())
 
             return expected_cnt
-        else:
-            raise NotImplementedError(f"Merge id {merge_def.get('id')} not implemented")
+        raise NotImplementedError(f"Merge id {merge_def.get('id')} not implemented")
 
     def _log_result(self, checked, cnt, gob_count, missing, success):
         if gob_count != cnt:
@@ -321,13 +323,14 @@ class DataConsistencyTest:
         return value
 
     def _transform_source_row(self, source_row: dict):
-        """Transforms rows from source database to the format the row should appear in the gob database, based on
-        the GOBModel and import definition mapping.
+        """Transforms rows from source database to the format the row should appear in
+        the gob database, based on the GOBModel and import definition mapping.
 
         :param source_row:
         :return:
         """
-        attributes = {k: v for k, v in self.collection['all_fields'].items() if k not in self.ignore_columns}
+        attributes = {k: v for k, v in self.collection['all_fields'].items()
+                      if k not in self.ignore_columns}
         result = {}
 
         for attr_name, attr in attributes.items():
@@ -343,7 +346,7 @@ class DataConsistencyTest:
                 if issubclass(type_, JSON):
                     self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
-                elif source_mapping and source_mapping[0] == '=':
+                if source_mapping and source_mapping[0] == '=':
                     value = self._transform_source_value(type_, source_mapping[1:], mapping)
                 elif source_mapping in source_row:
                     value = self._transform_source_value(type_, source_row[source_mapping], mapping)
@@ -509,10 +512,9 @@ class DataConsistencyTest:
     def _unpack_gob_json_value(self, attr_name: str, gob_value: Union[list, dict, None], keys: list[str]) -> dict:
         if gob_value is None:
             return {f"{attr_name}_{k}": None for k in keys}
-        elif isinstance(gob_value, list):
+        if isinstance(gob_value, list):
             return {f"{attr_name}_{k}": self._extract_attr_from_dict_list(k, gob_value) for k in keys}
-        else:
-            return {f"{attr_name}_{k}": gob_value.get(k) for k in keys}
+        return {f"{attr_name}_{k}": gob_value.get(k) for k in keys}
 
     def _transform_gob_row(self, gob_row: dict):
         ignore_source_mapping_keys = ["format", FIELD.START_VALIDITY, FIELD.END_VALIDITY]
@@ -594,14 +596,13 @@ WHERE
             gob_value = sorted([str(v).strip() for v in gob_value if v is not None])
 
             return src_value == gob_value
-        else:
-            # Compare the two values as string without whitespace, case-insensitive
-            gob_str_value = re.sub(r"\s+", "", str(gob_value)).lower()
-            src_str_value = re.sub(r"\s+", "", str(src_value)).lower()
-            if type(gob_value) == datetime.date:
-                # Remove any trailing zero-time to allow date to datetime comparison
-                src_str_value = re.sub(r"00:00:00$", "", src_str_value)
-            return gob_str_value == src_str_value
+        # Compare the two values as string without whitespace, case-insensitive
+        gob_str_value = re.sub(r"\s+", "", str(gob_value)).lower()
+        src_str_value = re.sub(r"\s+", "", str(src_value)).lower()
+        if type(gob_value) == datetime.date:
+            # Remove any trailing zero-time to allow date to datetime comparison
+            src_str_value = re.sub(r"00:00:00$", "", src_str_value)
+        return gob_str_value == src_str_value
 
     def _register_compared_columns(self, columns):
         if not self.compared_columns:
@@ -618,13 +619,13 @@ WHERE
         for gob_row in gob_rows:
             gob_row = self._transform_gob_row(gob_row)
 
-            # append empty list if match is found
+            # Append empty list if match is found.
             mismatches.append(self._find_mismatches(expected_values, gob_row))
 
-            # Check if any keys in GOB are unchecked, but ignore keys generated by GOB
-            # empty if all fields are unequal (find_mismatches)
-            not_checked_gob_keys = [k for k in gob_row.keys() if not any([k.endswith(w) and len(k) > len(w)
-                                                                          for w in ['_volgnummer', '_id', '_ref']])]
+            # Check if any keys in GOB are unchecked, but ignore keys generated by GOB.
+            # Empty if all fields are unequal (find_mismatches).
+            not_checked_gob_keys = [k for k in gob_row.keys() if not any(
+                k.endswith(w) and len(k) > len(w) for w in ['_volgnummer', '_id', '_ref'])]
             for key in not_checked_gob_keys:
                 self.gob_key_errors[key] = f"Have unexpected key left in GOB: {key}"
 
@@ -739,8 +740,8 @@ WHERE
                 arraysize=self.BATCH_SIZE,
                 withhold=True
             )
-        except GOBException as e:
-            print("Query failed", str(e), query)
+        except GOBException as exc:
+            print("Query failed", str(exc), query)
             # If autocommit = False the connection will be blocked for further queries
             # Reconnect explicitly to prevent subsequent SQL errors
             self.gob_db.connect()
