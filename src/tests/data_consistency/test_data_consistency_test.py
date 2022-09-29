@@ -3,20 +3,34 @@ from unittest.mock import patch, MagicMock, call
 
 import datetime
 
-from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException, GOBTypeException, Reference, FIELD, NotImplementedCatalogError, NotImplementedApplicationError
 from gobcore.typesystem.gob_types import ManyReference
 from gobcore.typesystem import GOB, GEO
 
+from gobtest.data_consistency.data_consistency_test import DataConsistencyTest, GOBException
+from gobtest.data_consistency.data_consistency_test import GOBTypeException, Reference, FIELD
+from gobtest.data_consistency.data_consistency_test import NotImplementedCatalogError, NotImplementedApplicationError
+
+from gobtest import gob_model
+
 
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition")
-@patch("gobtest.data_consistency.data_consistency_test.GOBModel")
+@patch("gobtest.data_consistency.data_consistency_test.gob_model", spec_set=True)
 class TestDataConsistencyTestInit(TestCase):
-    """Tests only constructor
-
-    """
+    """Tests only constructor."""
 
     def test_init(self, mock_model, mock_get_import_definition):
-        mock_model.return_value.get_collection.return_value = {'has_states': 'SioNo', 'references': [], 'attributes': {}}
+        mock_gobmodel_data = {
+            'the cat': {
+                'collections': {
+                    'the col': {
+                        'has_states': 'SioNo',
+                        'references': [],
+                        'attributes': {}
+                    }
+                }
+            }
+        }
+        mock_model.__getitem__.return_value = mock_gobmodel_data['the cat']
         mock_get_import_definition.return_value = {
             'source': {
                 'entity_id': 'THE ENTITY ID',
@@ -57,11 +71,10 @@ class TestDataConsistencyTestInit(TestCase):
             'not_provided_attr_b'
         ], instance.ignore_columns)
 
-        self.assertEqual(mock_model.return_value.get_collection.return_value, instance.collection)
+        self.assertEqual(
+            mock_gobmodel_data['the cat']['collections']['the col'], instance.collection)
 
-        mock_model.return_value.get_collection.assert_called_with('the cat', 'the col')
         mock_get_import_definition.assert_called_with('the cat', 'the col', 'the appl')
-
         mock_get_import_definition.return_value = {
             'source': {
                 'entity_id': 'THE ENTITY ID',
@@ -103,9 +116,19 @@ class TestDataConsistencyTestInit(TestCase):
                 'type': 'GOB.Reference'
             },
         }
-        mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
+        mock_gobmodel_data = {
+            'the cat': {
+                'collections': {
+                    'the col': {
+                        'attributes': mock_attributes
+                    }
+                }
+            }
+        }
+        mock_model.__getitem__.return_value = mock_gobmodel_data['the cat']
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
-        self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_bronwaarde'])
+        self.assertEqual(
+            instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_bronwaarde'])
 
     def test_init_skip_filtered_attributes(self, mock_model, mock_get_import_definition):
         mock_get_import_definition.return_value = {
@@ -142,9 +165,19 @@ class TestDataConsistencyTestInit(TestCase):
                 'type': 'GOB.String'
             }
         }
-        mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
+        mock_gobmodel_data = {
+            'the cat': {
+                'collections': {
+                    'the col': {
+                        'attributes': mock_attributes
+                    }
+                }
+            }
+        }
+        mock_model.__getitem__.return_value = mock_gobmodel_data['the cat']
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
-        self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_sub'])
+        self.assertEqual(
+            instance.ignore_columns, instance.default_ignore_columns + ['a', 'b', 'b_sub'])
 
     def test_init_skip_enriched_attributes(self, mock_model, mock_get_import_definition):
         mock_get_import_definition.return_value = {
@@ -187,16 +220,25 @@ class TestDataConsistencyTestInit(TestCase):
                 'type': 'GOB.String'
             }
         }
-        mock_model.return_value.get_collection.return_value = {'attributes': mock_attributes}
+        mock_gobmodel_data = {
+            'the cat': {
+                'collections': {
+                    'the col': {
+                        'attributes': mock_attributes
+                    }
+                }
+            }
+        }
+        mock_model.__getitem__.return_value = mock_gobmodel_data['the cat']
         instance = DataConsistencyTest('the cat', 'the col', 'the appl')
-        self.assertEqual(instance.ignore_columns, instance.default_ignore_columns + ['a', 'b_sub1', 'b_sub2'])
+        self.assertEqual(
+            instance.ignore_columns, instance.default_ignore_columns + ['a', 'b_sub1', 'b_sub2'])
 
 
 mock_get_import_definition = MagicMock()
 
-
 @patch("gobtest.data_consistency.data_consistency_test.get_import_definition", mock_get_import_definition)
-@patch("gobtest.data_consistency.data_consistency_test.GOBModel", MagicMock())
+@patch("gobtest.data_consistency.data_consistency_test.gob_model", MagicMock(spec_set=gob_model))
 class TestDataConsistencyTest(TestCase):
 
     def setUp(self) -> None:
@@ -294,7 +336,7 @@ class TestDataConsistencyTest(TestCase):
         mock_logger.info.assert_called_with('Completed data consistency test on 4 rows of 13 rows total. '
                                             '1 rows contained errors. 2 rows could not be found.')
 
-        inst._get_expected_merge_cnt.assert_called_with([x for x in range(13)])
+        inst._get_expected_merge_cnt.assert_called_with(list(range(13)))
 
     def test_get_expected_merge_cnt_diva_into_dgdialog(self):
         """Tests the case as commented in the tested method
@@ -910,8 +952,8 @@ WHERE
     @patch("gobtest.data_consistency.data_consistency_test.DatastoreFactory")
     @patch("gobtest.data_consistency.data_consistency_test.get_datastore_config", lambda x: x + '_CONFIG')
     @patch("gobtest.data_consistency.data_consistency_test.get_import_definition_by_filename")
-    def test_get_merge_data(self, mock_get_import_definition, mock_factory):
-        mock_get_import_definition.return_value = {
+    def test_get_merge_data(self, mock_get_import_definition_by_filename, mock_factory):
+        mock_get_import_definition_by_filename.return_value = {
             'source': {
                 'application': 'APPLICATION',
                 'read_config': 'THE READ CONFIG',
