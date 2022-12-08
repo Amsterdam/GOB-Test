@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch
 
-from gobtest.__main__ import SERVICEDEFINITION, DATA_CONSISTENCY_TEST, on_dump_listener
+from gobtest.__main__ import SERVICEDEFINITION, DATA_CONSISTENCY_TEST, on_events_listener
 
 
 class TestMain(TestCase):
@@ -15,7 +15,7 @@ class TestMain(TestCase):
 
     @patch("gobtest.__main__.start_workflow")
     @patch("gobtest.__main__.can_handle")
-    def test_on_dump_listener(self, mock_can_handle, mock_start_workflow):
+    def test_on_events_listener(self, mock_can_handle, mock_start_workflow):
         msg = {
             'type': 'dump',
             'contents': {'collection': 'SOME COLL', 'catalog': 'SOME CAT'},
@@ -28,12 +28,12 @@ class TestMain(TestCase):
         }
 
         mock_can_handle.return_value = False
-        on_dump_listener(msg)
+        on_events_listener(msg)
 
         mock_start_workflow.assert_not_called()
 
         mock_can_handle.return_value = True
-        on_dump_listener(msg)
+        on_events_listener(msg)
 
         mock_can_handle.assert_called_with(**{
             'catalogue': 'SOME CAT',

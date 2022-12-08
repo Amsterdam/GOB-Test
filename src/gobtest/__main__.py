@@ -26,7 +26,7 @@ from gobtest.e2e.handler import (
 from gobtest.data_consistency.handler import data_consistency_test_handler, can_handle
 
 
-def on_dump_listener(msg):
+def on_events_listener(msg):
     notification = get_notification(msg)
 
     workflow = {
@@ -86,8 +86,8 @@ SERVICEDEFINITION: ServiceDefinition = {
         }
     },
     'data_consistency_test_listener': {
-        'queue': lambda: listen_to_notifications("data_consistency_test", "dump"),
-        'handler': on_dump_listener
+        'queue': lambda: listen_to_notifications("data_consistency_test", "events"),
+        'handler': on_events_listener
     }
 }
 
