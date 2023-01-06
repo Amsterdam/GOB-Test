@@ -5,5 +5,7 @@ services:
     build:
       context: ../..
       target: test
+    environment:
+      REPO_BASE: "https://raw.githubusercontent.com/Amsterdam/amsterdam-schema/brk2_active_dataset"
     command: >
       bash -c "./test.sh"
