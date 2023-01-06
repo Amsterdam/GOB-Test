@@ -17,8 +17,8 @@ class TestMain(TestCase):
     @patch("gobtest.__main__.can_handle")
     def test_on_events_listener(self, mock_can_handle, mock_start_workflow):
         msg = {
-            'type': 'dump',
-            'contents': {'collection': 'SOME COLL', 'catalog': 'SOME CAT'},
+            'type': 'events',
+            'contents': {'applied': 'any applied', 'last_event': 'any last_event'},
             'header': {
                 'catalogue': 'SOME CAT',
                 'collection': 'SOME COLL',
