@@ -48,7 +48,7 @@ USER root
 RUN rm -rf /app/src/gobcore/tests
 
 # Copy test module and tests.
-COPY test.sh .flake8 pytest.ini ./
+COPY test.sh pyproject.toml ./
 COPY tests tests
 
 # Copy Jenkins files.
