@@ -23,7 +23,7 @@ echo "\nCheck if Black finds no potential reformat fixes"
 black --check --diff gobtest
 
 echo "\nCheck for potential import sort"
-isort --check --diff gobtest
+isort --check --diff --src-path=gobtest gobtest
 
 echo "\nRunning Flake8 style checks"
 flake8 gobtest
