@@ -1,14 +1,14 @@
 import datetime
 from typing import Optional
 
-from gobcore.logging.logger import logger
-from gobcore.exceptions import GOBException
 from gobconfig.exception import GOBConfigException
+from gobcore.exceptions import GOBException
+from gobcore.logging.logger import logger
 
 from gobtest.data_consistency.data_consistency_test import (
     DataConsistencyTest,
-    NotImplementedCatalogError,
     NotImplementedApplicationError,
+    NotImplementedCatalogError,
 )
 
 

@@ -3,39 +3,29 @@
 set -u # crash on missing env
 set -e # stop on any error
 
-# Coverage 6: coverage run --data-file=/tmp/.coveragerc …
+echo() {
+   builtin echo -e "$@"
+}
+
 export COVERAGE_FILE="/tmp/.coverage"
 
-# Uncomment files to pass through checks
-FILES=(
-#  "gobtest/data_consistency/handler.py"
-#  "gobtest/data_consistency/data_consistency_test.py"
-  "gobtest/data_consistency/__init__.py"
-  "gobtest/config.py"
-  "gobtest/__init__.py"
-#  "gobtest/e2e/handler.py"
-#  "gobtest/e2e/e2etest.py"
-  "gobtest/e2e/__init__.py"
-  "gobtest/e2e/expect/__init__.py"
-#  "gobtest/__main__.py"
-)
 
-echo "Running mypy"
-mypy "${FILES[@]}"
+echo "Running mypy on non-dirty files"
+mypy gobtest
 
-echo "Running unit tests"
+echo "\nRunning unit tests"
 coverage run --source=gobtest -m pytest
 
 echo "Coverage report"
 coverage report --fail-under=100
 
-echo "Check if Black finds no potential reformat fixes"
-black --check --diff "${FILES[@]}"
+echo "\nCheck if Black finds no potential reformat fixes"
+black --check --diff gobtest
 
-echo "Check for potential import sort"
-isort --check --diff "${FILES[@]}"
+echo "\nCheck for potential import sort"
+isort --check --diff --src-path=gobtest gobtest
 
-echo "Running flake8 style checks"
-flake8 "${FILES[@]}"
+echo "\nRunning Flake8 style checks"
+flake8 gobtest
 
-echo "Checks complete"
+echo "\nChecks complete"

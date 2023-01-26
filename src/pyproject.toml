@@ -79,10 +79,15 @@ no_implicit_reexport = true
 # This one can be tricky to get passing if you use a lot of untyped libraries
 warn_return_any = true
 
-# disable import checks for gobcore and gobconfig
+# Disable import checks for gobcore and gobconfig packages
 [[tool.mypy.overrides]]
 module = ["gobcore.*", "gobconfig.*"]
 ignore_missing_imports = true
+
+# Disable mypy checks for `dirty' gobtest modules
+[[tool.mypy.overrides]]
+module = ["gobtest.data_consistency.data_consistency_test", "gobtest.e2e.e2etest"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = "tests"
