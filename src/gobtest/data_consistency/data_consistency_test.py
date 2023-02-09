@@ -72,7 +72,7 @@ class DataConsistencyTest:
     SKIP_VALUE = "### SKIP VALUE ###"
 
     def __init__(self, catalog_name: str, collection_name: str, application: Optional[str] = None):
-
+        """Initialise DataConsistencyTest."""
         if catalog_name == "rel":
             raise NotImplementedCatalogError("Not implemented for the 'rel' catalog")
 
