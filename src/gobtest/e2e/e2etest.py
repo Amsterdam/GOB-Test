@@ -5,6 +5,7 @@ The end-to-end test tests importing, comparing, storing and relating of entities
 Program exit code is the number of errors that occurred, or -1 in case a system error occurred.
 """
 
+
 import os
 import time
 
@@ -209,7 +210,7 @@ class E2ETest:
             },
         }
 
-    def _execute_start_workflow_definition(self, workflow: list, process_id: str):
+    def _execute_start_workflow_definition(self, workflow: list[str], process_id: str):
         """Start a workflow as a separate job. Assign given :process_id: .
 
         Allows us to wait for the complete process including event-triggered jobs to finish before checking the
@@ -525,7 +526,7 @@ class E2ETest:
         """
         return self._build_e2e_workflow()
 
-    def execute_workflow(self, workflow: list, workflow_process_id: str):
+    def execute_workflow(self, workflow: list[str], workflow_process_id: str):
         """Execute workflow."""
         args = {
             "header": {
@@ -533,9 +534,7 @@ class E2ETest:
                 "process_id": workflow_process_id,
             }
         }
-        workflow = {"workflow_name": "dynamic"}
-
-        start_workflow(workflow, args)
+        start_workflow({"workflow_name": "dynamic"}, args)
 
     def pending_messages(self):
         """Report the number of pending messages for queues that contain notifications or start workflows.
@@ -595,7 +594,7 @@ class E2ETest:
         """
         self._log_info(f"Wait for process {process_id} to complete for max {max_seconds_to_try} seconds")
 
-        confirmed = 0  # Number of times the process has been confirmed to have finished
+        confirmed: float = 0  # Number of times the process has been confirmed to have finished
         last_pending_jobs = 0  # Last number of pending jobs that has been registered
         seconds_to_try = max_seconds_to_try  # Max nr seconds to wait for process to have finished
         while seconds_to_try > 0:
