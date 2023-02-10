@@ -87,11 +87,6 @@ module = [
 ]
 ignore_missing_imports = true
 
-# Disable mypy checks for `dirty' gobtest modules
-[[tool.mypy.overrides]]
-module = ["gobtest.data_consistency.data_consistency_test"]
-ignore_errors = true
-
 [tool.pytest.ini_options]
 testpaths = "tests"
 cache_dir = "/tmp/.pytest_cache"
