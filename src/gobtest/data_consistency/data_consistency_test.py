@@ -4,7 +4,7 @@ import operator
 import random
 import re
 from functools import reduce
-from typing import Iterator, Optional, Union
+from typing import Any, Iterator, Optional, Union
 
 from gobconfig.datastore.config import get_datastore_config
 from gobconfig.import_.import_config import get_import_definition, get_import_definition_by_filename
@@ -23,19 +23,19 @@ from gobtest import gob_model
 GOB_DB = "GOBDatabase"
 
 
-class NotImplementedCatalogError(GOBException):
+class NotImplementedCatalogError(GOBException):  # type: ignore[misc]
     """Not Implemented Catalog Error."""
 
     pass
 
 
-class NotImplementedApplicationError(GOBException):
+class NotImplementedApplicationError(GOBException):  # type: ignore[misc]
     """Not Implemented Application Error."""
 
     pass
 
 
-def escape(value):
+def escape(value: str) -> str:
     """Properly escape values in string query."""
     return value.replace("'", "''").replace("%", "%%") if isinstance(value, str) else value
 
@@ -71,8 +71,8 @@ class DataConsistencyTest:
     # Example: code and gemeentenaam in row properties of BRK gemeentes
     SKIP_VALUE = "### SKIP VALUE ###"
 
-    def __init__(self, catalog_name: str, collection_name: str, application: Optional[str] = None):
-
+    def __init__(self, catalog_name: str, collection_name: str, application: Optional[str] = None) -> None:
+        """Initialise DataConsistencyTest."""
         if catalog_name == "rel":
             raise NotImplementedCatalogError("Not implemented for the 'rel' catalog")
 
@@ -87,10 +87,10 @@ class DataConsistencyTest:
         self.collection = gob_model[catalog_name]["collections"][collection_name]
         self.entity_id_field = self.source["entity_id"]
         self.has_states = self.collection.get("has_states", False)
-        self.gob_key_errors = {}
-        self.src_key_warnings = {}
+        self.gob_key_errors: dict[str, str] = {}
+        self.src_key_warnings: dict[str, str] = {}
         self.is_merged = self.source.get("merge") is not None
-        self.compared_columns = []
+        self.compared_columns: list[str] = []
 
         # Ignore enriched attributes by default
         self.ignore_columns = (
@@ -112,7 +112,7 @@ class DataConsistencyTest:
         # Ignore columns that have enriched values in GOB-Import
         self.ignore_enriched_columns()
 
-    def ignore_filtered_columns(self):
+    def ignore_filtered_columns(self) -> None:
         """Ignore any fields that have a filter definition.
 
         A filter definition is a non-empty array of filters that are applied to any field value
@@ -131,7 +131,7 @@ class DataConsistencyTest:
                         if mapping["filters"][key]:
                             self.ignore_columns.append(f"{attribute}_{key}")
 
-    def ignore_secure_columns(self):
+    def ignore_secure_columns(self) -> None:
         """Ignore any secure fields.
 
         Ignore secure columns to prevent leakage of private data
@@ -146,7 +146,7 @@ class DataConsistencyTest:
                 if issubclass(gob_type, Reference):
                     self.ignore_columns.append(f"{attribute}_bronwaarde")
 
-    def ignore_enriched_columns(self):
+    def ignore_enriched_columns(self) -> None:
         """Ignore any enriched fields.
 
         :return:
@@ -162,7 +162,7 @@ class DataConsistencyTest:
                 else:
                     self.ignore_columns.append(attribute)
 
-    def run(self):
+    def run(self) -> None:
         """Run data consistency test."""
         self._connect()
         test_every = 1 / self.SAMPLE_SIZE
@@ -210,7 +210,7 @@ class DataConsistencyTest:
 
         self._log_result(checked, cnt, gob_count, missing, success)
 
-    def _get_expected_merge_cnt(self, merge_ids: list):
+    def _get_expected_merge_cnt(self, merge_ids: list[str]) -> int:
         merge_def = self.source.get("merge")
 
         merge_objects = self._get_merge_data()
@@ -251,14 +251,14 @@ class DataConsistencyTest:
             on = merge_def.get("on")
 
             # Collect id's with counts from merged data, where id is the field that is used to match the two sources
-            ids = reduce(lambda x, y: x.update({y[on]: x.get(y[on], 0) + 1}) or x, merge_objects, {})
+            ids: dict[str, int] = reduce(lambda x, y: x.update({y[on]: x.get(y[on], 0) + 1}) or x, merge_objects, {})
 
             expected_cnt = len(merge_ids) + sum(cnt if id_ not in merge_ids else cnt - 1 for id_, cnt in ids.items())
 
             return expected_cnt
         raise NotImplementedError(f"Merge id {merge_def.get('id')} not implemented")
 
-    def _log_result(self, checked, cnt, gob_count, missing, success):
+    def _log_result(self, checked, cnt, gob_count, missing, success) -> None:
         if gob_count != cnt:
             logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count):,})")
 
@@ -277,22 +277,24 @@ class DataConsistencyTest:
             + f" {missing:,} rows could not be found."
         )
 
-    def _src_key_warning(self, attr_name, msg):
+    def _src_key_warning(self, attr_name, msg) -> None:
         self.src_key_warnings[attr_name] = msg
 
-    def _gob_key_error(self, attr_name, msg):
+    def _gob_key_error(self, attr_name, msg) -> None:
         if attr_name not in self.src_key_warnings:
             # Don't report about something already noticed in the source
             self.gob_key_errors[attr_name] = msg
 
-    def _geometry_to_wkt(self, geo_value: str):
+    def _geometry_to_wkt(self, geo_value: str) -> Optional[str]:
         if geo_value is None:
             return None
-        result = next(self._read_from_gob_db(f"SELECT ST_AsText('{geo_value}'::geometry)"))
+        result = None
+        if geo_db_value := self._read_from_gob_db(f"SELECT ST_AsText('{geo_value}'::geometry)"):
+            result = next(geo_db_value)
         return result[0] if result else None
 
     @staticmethod
-    def _normalise_wkt(wkt_value: str):
+    def _normalise_wkt(wkt_value: Optional[str]) -> Optional[str]:
         """Remove spaces in WKT definition.
 
         Remove space after type keyword and before first parenthesis in WKT definition,
@@ -330,17 +332,17 @@ class DataConsistencyTest:
                 value = self._normalise_wkt(value)
         return value
 
-    def _transform_source_row(self, source_row: dict):
+    def _transform_source_row(self, source_row: dict[str, str]) -> dict[str, str]:
         """Transform rows from source database.
 
         Transform rows from source database to the format the row should appear in
-        the gob database, based on the GOBModel and import definition mapping.
+        the GOB database, based on the GOBModel and import definition mapping.
 
         :param source_row:
         :return:
         """
         attributes = {k: v for k, v in self.collection["all_fields"].items() if k not in self.ignore_columns}
-        result = {}
+        result: dict[str, str] = {}
 
         for attr_name, attr in attributes.items():
             mapping = self.import_definition["gob_mapping"].get(attr_name)
@@ -367,7 +369,9 @@ class DataConsistencyTest:
 
         return result
 
-    def _unpack(self, type_, attr_name: str, mapping: dict, source_row: dict, result: dict):
+    def _unpack(
+        self, type_, attr_name: str, mapping: dict[str, str], source_row: dict[str, str], result: dict[str, str]
+    ) -> None:
         args = (attr_name, mapping, source_row, result)
         if issubclass(type_, Reference):
             # Reference, ManyReference and VeryManyReference
@@ -377,7 +381,7 @@ class DataConsistencyTest:
         else:
             self._unpack_json(*args)
 
-    def _unpack_incomplete_date(self, attr_name, mapping, source_row, result):
+    def _unpack_incomplete_date(self, attr_name, mapping, source_row: dict[str, str], result) -> None:
         # Only unpack available attributes from model
         # source_mapping should be a str referring to the source column with json data
         source_mapping = mapping["source_mapping"]
@@ -408,7 +412,7 @@ class DataConsistencyTest:
         # Return a list from the string splitted on the separator and each value trimmed
         return [v.strip() for v in string.split(separator) if v]
 
-    def _unpack_reference(self, gob_type, attr_name, mapping, source_row, result):
+    def _unpack_reference(self, gob_type, attr_name, mapping, source_row: dict[str, Any], result) -> None:
         """Unpack a GOB.Reference.
 
         Handle single and many references, also support dict attribute references.
@@ -447,13 +451,13 @@ class DataConsistencyTest:
 
         result[dst_key] = dst_value
 
-    def _format(self, format_def: dict, value):
+    def _format(self, format_def: dict[str, str], value: str) -> list[str]:
         if "split" in format_def:
             return [] if value is None else value.split(format_def["split"])
 
         raise NotImplementedError("Format action not implemented")
 
-    def _unpack_json(self, attr_name, mapping, source_row, result):  # noqa: C901
+    def _unpack_json(self, attr_name, mapping, source_row: dict[str, Any], result):  # noqa: C901
         """Unpack a JSON GOB field (not being a Reference, this is handled in _unpack_reference).
 
         :param attr_name:
@@ -493,11 +497,11 @@ class DataConsistencyTest:
             # Skip JSON's that are not imported per attribute
             self._src_key_warning(attr_name, f"Skip JSON {attr_name} that is imported as non- or empty-JSON")
 
-    def _extract_attr_from_dict_list(self, key: str, dictlist: list[dict]) -> list:
+    def _extract_attr_from_dict_list(self, key: str, dictlist: list[dict[str, str]]) -> list[str]:
         return [obj[key] for obj in dictlist]
 
     @staticmethod
-    def _load_json_source_data(source_mapping: dict, source_row: dict):
+    def _load_json_source_data(source_mapping: str, source_row: dict[str, str]):
         """Try to load JSON data since we sometimes receive a string from the source database.
 
         :param source_mapping:
@@ -505,29 +509,31 @@ class DataConsistencyTest:
         :return:
         """
         try:
-            return json.loads(source_row.get(source_mapping))
+            return json.loads(source_row[source_mapping])
         except (TypeError, json.decoder.JSONDecodeError):
             return source_row.get(source_mapping)
 
-    def _normalise_geometries(self, gob_row: dict):
+    def _normalise_geometries(self, gob_row: dict[str, str]):
         normalised = {}
         for geo_key in [k for k, v in self.collection["all_fields"].items() if v["type"].startswith("GOB.Geo")]:
             normalised[geo_key] = self._normalise_wkt(self._geometry_to_wkt(gob_row[geo_key]))
         return {**gob_row, **normalised}
 
-    def _unpack_gob_json_value(self, attr_name: str, gob_value: Union[list, dict, None], keys: list[str]) -> dict:
+    def _unpack_gob_json_value(
+        self, attr_name: str, gob_value: Union[list[dict[str, str]], dict[str, str], None], keys: list[str]
+    ) -> dict[str, Union[list[str], str, None]]:
         if gob_value is None:
             return {f"{attr_name}_{k}": None for k in keys}
         if isinstance(gob_value, list):
             return {f"{attr_name}_{k}": self._extract_attr_from_dict_list(k, gob_value) for k in keys}
         return {f"{attr_name}_{k}": gob_value.get(k) for k in keys}
 
-    def _transform_gob_row(self, gob_row: dict):
+    def _transform_gob_row(self, gob_row: dict[str, str]):
         ignore_source_mapping_keys = ["format", FIELD.START_VALIDITY, FIELD.END_VALIDITY]
         row = self._normalise_geometries(gob_row)
 
         attributes = {k: v for k, v in self.collection["all_fields"].items() if k not in self.ignore_columns}
-        result = {}
+        result: dict[str, Union[list[str], str, None]] = {}
 
         for attr_name, attr in attributes.items():
             type_ = get_gob_type_from_info(attr)
@@ -548,7 +554,7 @@ class DataConsistencyTest:
 
         return result
 
-    def _select_from_gob_query(self, select, where=None):
+    def _select_from_gob_query(self, select, where=None) -> str:
         """Build SELECT FROM GOB query.
 
         The GOB data that corresponds with the source is characterised by at least a
@@ -576,27 +582,30 @@ WHERE
     {where}
 """
 
-    def _get_gob_count(self):
+    def _get_gob_count(self) -> Optional[int]:
         """Return the number of entities in GOB.
 
         :return:
         """
         query = self._select_from_gob_query(select="count(*)")
-        result = next(self._read_from_gob_db(query))
-        return dict(result)["count"]
+        result = None
+        if db_result := self._read_from_gob_db(query):
+            result = dict(next(db_result))["count"]
+        return result
 
     @staticmethod
-    def equal_values(src_value, gob_value) -> bool:
+    def equal_values(src_value: Union[list[str], str], gob_value: Union[list[str], str, datetime.date]) -> bool:
         """Value equality between source and GOB is normally a simple string comparison.
 
-        If however the src_value is an array it has to be compared against a GOB string
-        The empty values are eliminated from both the source string as the GOB string
-        Finally the regular string comparison can be used
+        If however the src_value is an array it has to be compared against a GOB string.
+        The empty values are eliminated from both the source string as the GOB string.
+        Finally the regular string comparison can be used.
+
         :param src_value:
         :param gob_value:
         :return:
         """
-        if isinstance(src_value, list):
+        if isinstance(src_value, list) and isinstance(gob_value, list):
             src_value = sorted([str(v).strip() for v in src_value if v is not None])
             gob_value = sorted([str(v).strip() for v in gob_value if v is not None])
 
@@ -609,15 +618,15 @@ WHERE
             src_str_value = re.sub(r"00:00:00$", "", src_str_value)
         return gob_str_value == src_str_value
 
-    def _register_compared_columns(self, columns):
+    def _register_compared_columns(self, columns: list[str]) -> None:
         if not self.compared_columns:
             # Register the columns that have been compared
             self.compared_columns = columns
 
-    def _validate_minimal_one_row(self, source_row: dict, gob_rows: list):
+    def _validate_minimal_one_row(self, source_row: dict[str, str], gob_rows: list[dict[str, str]]) -> bool:
         """Return true if `source_row` equals minimal one of the elements in `gob_rows`."""
         expected_values = self._transform_source_row(source_row)
-        self._register_compared_columns(expected_values.keys())
+        self._register_compared_columns(list(expected_values.keys()))
         start_error_cnt = len(logger.get_errors())
 
         mismatches = []
@@ -647,12 +656,12 @@ WHERE
 
         return start_error_cnt == len(logger.get_errors())
 
-    def _find_mismatches(self, expected_values: dict, gob_row: dict) -> list:
+    def _find_mismatches(self, expected_values: dict[str, str], gob_row: dict[str, str]) -> list[tuple[str, str, str]]:
         """Find mismatching values between `expected_values` and `gob_row`.
 
         Return empty list when `gob_row` is a match.
         """
-        mismatches = []
+        mismatches: list[tuple[str, str, str]] = []
 
         for attr, value in expected_values.items():
             try:
@@ -667,10 +676,10 @@ WHERE
 
         return mismatches
 
-    def _get_row_id(self, source_row: dict):
+    def _get_row_id(self, source_row: dict[str, str]) -> Optional[str]:
         return source_row.get(self.entity_id_field)
 
-    def _get_matching_gob_rows(self, source_row: dict) -> list:
+    def _get_matching_gob_rows(self, source_row: dict[str, str]) -> Optional[list[dict[str, str]]]:
         """Get matching GOB rows.
 
         A matching row(s) in the analysis database has the following properties:
@@ -702,8 +711,9 @@ WHERE
         where.append(f"{FIELD.SOURCE_ID} {is_source_id} '{source_id}'")
 
         query = self._select_from_gob_query(select="*", where=where)
-        result = [dict(res) for res in self._read_from_gob_db(query)]
-
+        result = None
+        if db_result := self._read_from_gob_db(query):
+            result = [dict(res) for res in db_result]
         return result if result else None
 
     def _get_source_data(self):
@@ -727,7 +737,7 @@ WHERE
         merge_connection.connect()
         return merge_connection.query("\n".join(merge_source.get("query", [])))
 
-    def _connect(self):
+    def _connect(self) -> None:
         datastore_config = self.source.get("application_config") or get_datastore_config(self.source["application"])
 
         self.src_datastore = DatastoreFactory.get_datastore(datastore_config, self.source.get("read_config", {}))
@@ -736,8 +746,8 @@ WHERE
         self.gob_db = DatastoreFactory.get_datastore(get_datastore_config(GOB_DB))
         self.gob_db.connect()
 
-    def _read_from_gob_db(self, query) -> Optional[Iterator]:
-        """Read from the gob db using server-side cursor. Reconnect if any query fails.
+    def _read_from_gob_db(self, query) -> Optional[Iterator[tuple[Any, Any]]]:
+        """Read from the GOB db using server-side cursor. Reconnect if any query fails.
 
         autocommit = True on the connection would also solve the problem
         but this logic is independent from the DatastoreFactory implementation
@@ -746,7 +756,10 @@ WHERE
         :return:
         """
         try:
-            return self.gob_db.query(query, name="test_gob_db_cursor", arraysize=self.BATCH_SIZE, withhold=True)
+            db_result: Iterator[tuple[Any, Any]] = self.gob_db.query(
+                query, name="test_gob_db_cursor", arraysize=self.BATCH_SIZE, withhold=True
+            )
+            return db_result
         except GOBException as exc:
             print("Query failed", str(exc), query)
             # If autocommit = False the connection will be blocked for further queries

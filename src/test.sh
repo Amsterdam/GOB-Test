@@ -10,7 +10,7 @@ echo() {
 export COVERAGE_FILE="/tmp/.coverage"
 
 
-echo "Running mypy on non-dirty files"
+echo "Running mypy"
 mypy gobtest
 
 echo "\nRunning unit tests"
