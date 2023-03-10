@@ -79,10 +79,18 @@ no_implicit_reexport = true
 # This one can be tricky to get passing if you use a lot of untyped libraries
 warn_return_any = true
 
-# Disable import checks for gobcore package
+# Disable import checks for non typed gobcore modules
 [[tool.mypy.overrides]]
 module = [
-    "gobcore.*",
+    "gobcore.datastore.factory",
+    "gobcore.exceptions",
+    "gobcore.logging.logger",
+    "gobcore.message_broker.*",
+    "gobcore.model",
+    "gobcore.model.metadata",
+    "gobcore.typesystem.*",
+    "gobcore.utils",
+    "gobcore.workflow.start_workflow",
     "requests.*",
 ]
 ignore_missing_imports = true
