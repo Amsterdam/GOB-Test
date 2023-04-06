@@ -15,7 +15,7 @@ from gobcore.model.metadata import FIELD
 from gobcore.typesystem import get_gob_type_from_info
 from gobcore.typesystem.gob_geotypes import GEOType
 from gobcore.typesystem.gob_secure_types import Secure
-from gobcore.typesystem.gob_types import JSON, IncompleteDate, Reference
+from gobcore.typesystem.gob_types import JSON, IncompleteDate, Reference, get_kwargs_from_type_info
 from gobcore.utils import ProgressTicker
 
 from gobtest import gob_model
@@ -258,7 +258,7 @@ class DataConsistencyTest:
             return expected_cnt
         raise NotImplementedError(f"Merge id {merge_def.get('id')} not implemented")
 
-    def _log_result(self, checked, cnt, gob_count, missing, success) -> None:
+    def _log_result(self, checked: int, cnt: int, gob_count, missing: int, success: int) -> None:
         if gob_count != cnt:
             logger.error(f"Counts don't match: source {cnt:,} - GOB {gob_count:,} ({abs(cnt - gob_count):,})")
 
@@ -277,10 +277,10 @@ class DataConsistencyTest:
             + f" {missing:,} rows could not be found."
         )
 
-    def _src_key_warning(self, attr_name, msg) -> None:
+    def _src_key_warning(self, attr_name: str, msg: str) -> None:
         self.src_key_warnings[attr_name] = msg
 
-    def _gob_key_error(self, attr_name, msg) -> None:
+    def _gob_key_error(self, attr_name: str, msg: str) -> None:
         if attr_name not in self.src_key_warnings:
             # Don't report about something already noticed in the source
             self.gob_key_errors[attr_name] = msg
@@ -332,7 +332,7 @@ class DataConsistencyTest:
                 value = self._normalise_wkt(value)
         return value
 
-    def _transform_source_row(self, source_row: dict[str, str]) -> dict[str, str]:
+    def _transform_source_row(self, source_row: dict[str, str]) -> dict[str, Any]:
         """Transform rows from source database.
 
         Transform rows from source database to the format the row should appear in
@@ -344,7 +344,7 @@ class DataConsistencyTest:
         attributes = {k: v for k, v in self.collection["all_fields"].items() if k not in self.ignore_columns}
         result: dict[str, str] = {}
 
-        for attr_name, attr in attributes.items():
+        for attr_name, type_info in attributes.items():
             mapping = self.import_definition["gob_mapping"].get(attr_name)
 
             if mapping is None:
@@ -352,15 +352,19 @@ class DataConsistencyTest:
                 self._src_key_warning(attr_name, f"Skipped {attr_name} because no mapping is found")
             else:
                 source_mapping = mapping["source_mapping"]
-                type_ = get_gob_type_from_info(attr)
+                type_ = get_gob_type_from_info(type_info)
 
                 if issubclass(type_, JSON):
                     self._unpack(type_, attr_name, mapping, source_row, result)
                     continue
                 if source_mapping and source_mapping[0] == "=":
-                    value = self._transform_source_value(type_, source_mapping[1:], mapping)
+                    value = self._transform_source_value(
+                        type_, source_mapping[1:], get_kwargs_from_type_info(type_info) | mapping
+                    )
                 elif source_mapping in source_row:
-                    value = self._transform_source_value(type_, source_row[source_mapping], mapping)
+                    value = self._transform_source_value(
+                        type_, source_row[source_mapping], get_kwargs_from_type_info(type_info) | mapping
+                    )
                 else:
                     self._src_key_warning(attr_name, f"Skipped {attr_name} because it is missing in the input")
                     value = self.SKIP_VALUE
