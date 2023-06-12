@@ -47,7 +47,8 @@ def data_consistency_test_handler(msg):
     # No return value. Results are captured by logger.
     logger.info(f"Data consistency test {id} started")
     try:
-        DataConsistencyTest(catalog, collection, application).run()
+        with DataConsistencyTest(catalog, collection, application) as tester:
+            tester.run()
     except GOBConfigException as e:
         logger.error(f"Dataset connection failed: {str(e)}")
     except (NotImplementedCatalogError, NotImplementedApplicationError, GOBException) as e:

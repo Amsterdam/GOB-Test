@@ -1001,3 +1001,28 @@ WHERE
             call('GOBDatabase_CONFIG'),
             call().connect(),
         ])
+
+    def test_context(self):
+        mock_src_ds = MagicMock()
+        mock_gob_db = MagicMock()
+
+        with DataConsistencyTest('cat', 'col') as test:
+            test.src_datastore = mock_src_ds
+            test.gob_db = mock_gob_db
+
+        mock_src_ds.disconnect.assert_called()
+        mock_gob_db.disconnect.assert_called()
+
+    def test_context_exception(self):
+        mock_src_ds = MagicMock()
+        mock_gob_db = MagicMock()
+
+        with self.assertRaises(Exception):
+            with DataConsistencyTest('cat', 'col') as test:
+                test.src_datastore = mock_src_ds
+                test.gob_db = mock_gob_db
+
+                raise Exception
+
+        mock_src_ds.disconnect.assert_called()
+        mock_gob_db.disconnect.assert_called()
