@@ -21,7 +21,8 @@ class TestDataConsistencyTestHandler(TestCase):
         res = data_consistency_test_handler(msg)
 
         mock_test.assert_called_with('the catalogue', 'the collection', 'the application')
-        mock_test.return_value.run.assert_called_once()
+        mock_test.return_value.__enter__.return_value.run.assert_called_once()
+        mock_test.return_value.__exit__.assert_called_once()
 
         self.assertEqual({
             'header': {

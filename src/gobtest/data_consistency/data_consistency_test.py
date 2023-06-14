@@ -112,6 +112,14 @@ class DataConsistencyTest:
         # Ignore columns that have enriched values in GOB-Import
         self.ignore_enriched_columns()
 
+    def __enter__(self):
+        """Enter DataConsistencyTest context."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit DataConsistencyTest context, always disconnect from datastores."""
+        self._disconnect()
+
     def ignore_filtered_columns(self) -> None:
         """Ignore any fields that have a filter definition.
 
@@ -749,6 +757,12 @@ WHERE
 
         self.gob_db = DatastoreFactory.get_datastore(get_datastore_config(GOB_DB))
         self.gob_db.connect()
+
+    def _disconnect(self):
+        if hasattr(self, "src_datastore") and self.src_datastore:
+            self.src_datastore.disconnect()
+        if hasattr(self, "gob_db") and self.gob_db:
+            self.gob_db.disconnect()
 
     def _read_from_gob_db(self, query) -> Optional[Iterator[tuple[Any, Any]]]:
         """Read from the GOB db using server-side cursor. Reconnect if any query fails.
