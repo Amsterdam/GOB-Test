@@ -625,7 +625,7 @@ WHERE
         # Compare the two values as string without whitespace, case-insensitive
         gob_str_value = re.sub(r"\s+", "", str(gob_value)).lower()
         src_str_value = re.sub(r"\s+", "", str(src_value)).lower()
-        if type(gob_value) == datetime.date:
+        if type(gob_value) == datetime.date:  # noqa: E721, isinstance is no option here
             # Remove any trailing zero-time to allow date to datetime comparison
             src_str_value = re.sub(r"00:00:00$", "", src_str_value)
         return gob_str_value == src_str_value
